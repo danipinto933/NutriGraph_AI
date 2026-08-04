@@ -1,0 +1,79 @@
+name: CD - NutriGraph AI Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Format repository name for docker tag
+        id: repo
+        run: echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: Build and Push user-auth-service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/user-auth-service
+          file: ./services/user-auth-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}/user-auth-service:latest
+            ghcr.io/${{ env.REPO_LOWER }}/user-auth-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push nutrition-graph-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/nutrition-graph-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}/nutrition-graph-service:latest
+            ghcr.io/${{ env.REPO_LOWER }}/nutrition-graph-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push ai-agent-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/ai-agent-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}/ai-agent-service:latest
+            ghcr.io/${{ env.REPO_LOWER }}/ai-agent-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend/angular-app
+          file: ./frontend/angular-app/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}/frontend:latest
+            ghcr.io/${{ env.REPO_LOWER }}/frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

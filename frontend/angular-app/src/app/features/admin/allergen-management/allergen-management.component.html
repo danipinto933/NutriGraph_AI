@@ -1,0 +1,72 @@
+<div class="user-management">
+  <div class="header-actions">
+    <h2>Gestión de Alérgenos e Intolerancias</h2>
+    <div class="header-controls">
+      <div class="search-bar">
+        <input 
+          type="text" 
+          class="form-control search-input" 
+          placeholder="Buscar por nombre..." 
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+        >
+      </div>
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        + Nuevo Alérgeno
+      </button>
+    </div>
+  </div>
+
+  <div class="error-msg" *ngIf="error()">
+    {{ error() }}
+  </div>
+
+  <div class="table-container">
+    <table class="premium-table">
+      <thead>
+        <tr>
+          <th>Nombre del Alérgeno</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let allergen of filteredAllergens">
+          <td>
+            <span class="badge badge-admin">{{ allergen.name }}</span>
+          </td>
+          <td class="actions">
+            <button class="btn btn-icon btn-edit" (click)="openEditModal(allergen)" title="Editar">
+              ✏️
+            </button>
+            <button class="btn btn-icon btn-delete" (click)="deleteAllergen(allergen)" title="Eliminar">
+              🗑️
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredAllergens.length === 0">
+          <td colspan="2" class="text-center">No se encontraron alérgenos.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal Crear/Editar -->
+  <div class="modal-overlay" *ngIf="showModal()">
+    <div class="modal-content form-scrollable">
+      <h3>{{ isEditing() ? 'Editar Alérgeno' : 'Crear Alérgeno' }}</h3>
+      <form (ngSubmit)="saveAllergen()">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" [ngModel]="currentAllergenName()" name="name" (ngModelChange)="currentAllergenName.set($event)" required class="form-control" placeholder="Ej. Gluten, Lactosa, Cacahuetes...">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading()">
+            {{ isEditing() ? 'Guardar' : 'Crear' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

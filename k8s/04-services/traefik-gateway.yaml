@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik-gateway
+  namespace: default
+  labels:
+    app: traefik-gateway
+    app.kubernetes.io/part-of: nutrigraph-ai
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik-gateway
+  template:
+    metadata:
+      labels:
+        app: traefik-gateway
+    spec:
+      containers:
+        - name: traefik
+          image: traefik:v2.10
+          args:
+            - "--api.insecure=true"
+            - "--providers.kubernetesingress=true"
+            - "--entrypoints.web.address=:80"
+          ports:
+            - containerPort: 80
+              name: web
+            - containerPort: 8080
+              name: dashboard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-gateway
+  namespace: default
+  labels:
+    app: traefik-gateway
+    app.kubernetes.io/part-of: nutrigraph-ai
+spec:
+  type: LoadBalancer
+  selector:
+    app: traefik-gateway
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+    - name: dashboard
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nutrigraph-ingress
+  namespace: default
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: user-auth-service
+                port:
+                  number: 8000
+          - path: /api/v1/nutrition
+            pathType: Prefix
+            backend:
+              service:
+                name: nutrition-graph-service
+                port:
+                  number: 8000
+          - path: /api/v1/chat
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-agent-service
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

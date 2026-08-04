@@ -1,0 +1,295 @@
+<div class="user-management">
+  <div class="header-actions">
+    <h2>Gestión de Ingredientes</h2>
+    <div class="header-controls">
+      <div class="search-bar">
+        <input type="text" class="form-control search-input" placeholder="Buscar por nombre, categoría u origen..."
+          [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)">
+      </div>
+
+
+      <div class="view-controls" *ngIf="viewMode() === 'accordion'">
+        <button class="btn btn-secondary btn-sm" (click)="expandAllCategories()" title="Expandir todas las categorías">
+          📖 Expandir todo
+        </button>
+        <button class="btn btn-secondary btn-sm" (click)="collapseAllCategories()"
+          title="Colapsar todas las categorías">
+          📕 Colapsar todo
+        </button>
+      </div>
+
+      <button class="btn btn-secondary" (click)="viewMode.set(viewMode() === 'accordion' ? 'table' : 'accordion')"
+        [title]="viewMode() === 'accordion' ? 'Cambiar a Vista de Tabla Unificada' : 'Cambiar a Vista Desplegable por Categorías'">
+        {{ viewMode() === 'accordion' ? '📊 Vista Tabla' : '📂 Vista Desplegable' }}
+      </button>
+
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        + Nuevo Ingrediente
+      </button>
+    </div>
+  </div>
+
+  <div class="error-msg" *ngIf="error()">
+    {{ error() }}
+  </div>
+
+  <!-- Vista 1: Acordeón Desplegable por Categorías -->
+  <div class="accordion-container" *ngIf="viewMode() === 'accordion'">
+    <div *ngIf="groupedIngredients.length === 0" class="empty-state">
+      <p>No se encontraron ingredientes con los criterios de búsqueda.</p>
+    </div>
+
+    <div class="category-accordion-card" *ngFor="let group of groupedIngredients"
+      [class.is-collapsed]="isCategoryCollapsed(group.category)">
+      <div class="accordion-header" (click)="toggleCategory(group.category)">
+        <div class="accordion-title-wrapper">
+          <span class="accordion-icon">
+            {{ isCategoryCollapsed(group.category) ? '►' : '▼' }}
+          </span>
+          <span class="category-name-badge">
+            🏷️ {{ group.category }}
+          </span>
+          <span class="category-count-chip">
+            {{ group.count }} ingrediente{{ group.count === 1 ? '' : 's' }}
+          </span>
+        </div>
+        <div class="accordion-action-hint">
+          <span class="hint-text">{{ isCategoryCollapsed(group.category) ? 'Mostrar' : 'Ocultar' }}</span>
+        </div>
+      </div>
+
+      <div class="accordion-body" *ngIf="!isCategoryCollapsed(group.category)">
+        <div class="table-container">
+          <table class="premium-table">
+            <thead>
+              <tr>
+                <th (click)="sortBy('name')" class="sortable">
+                  Nombre <span class="sort-icon" *ngIf="sortColumn() === 'name'">{{ sortDirection() === 'asc' ? '▲' :
+                    '▼' }}</span>
+                </th>
+                <th (click)="sortBy('calorias_100g')" class="sortable">
+                  Kcal (100g) <span class="sort-icon" *ngIf="sortColumn() === 'calorias_100g'">{{ sortDirection() ===
+                    'desc' ? '▼' : '▲' }}</span>
+                </th>
+                <th (click)="sortBy('proteinas_100g')" class="sortable">
+                  Proteínas <span class="sort-icon" *ngIf="sortColumn() === 'proteinas_100g'">{{ sortDirection() ===
+                    'desc' ? '▼' : '▲' }}</span>
+                </th>
+                <th (click)="sortBy('grasas_100g')" class="sortable">
+                  Grasas <span class="sort-icon" *ngIf="sortColumn() === 'grasas_100g'">{{ sortDirection() === 'desc' ?
+                    '▼' : '▲' }}</span>
+                </th>
+                <th (click)="sortBy('carbohidratos_100g')" class="sortable">
+                  Carbs <span class="sort-icon" *ngIf="sortColumn() === 'carbohidratos_100g'">{{ sortDirection() ===
+                    'desc' ? '▼' : '▲' }}</span>
+                </th>
+                <th (click)="sortBy('origen')" class="sortable">
+                  Origen <span class="sort-icon" *ngIf="sortColumn() === 'origen'">{{ sortDirection() === 'asc' ? '▲' :
+                    '▼' }}</span>
+                </th>
+                <th>Alérgenos</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let ingredient of group.ingredients">
+                <td><strong>{{ ingredient.name }}</strong></td>
+                <td>{{ ingredient.calorias_100g }} kcal</td>
+                <td>{{ ingredient.proteinas_100g }}g</td>
+                <td>{{ ingredient.grasas_100g }}g</td>
+                <td>{{ ingredient.carbohidratos_100g }}g</td>
+                <td>
+                  <span class="badge"
+                    [ngClass]="ingredient.origen === 'animal' ? 'badge-origin-animal' : 'badge-origin-vegetal'">
+                    {{ ingredient.origen }}
+                  </span>
+                </td>
+                <td>
+                  <ng-container *ngIf="ingredient.allergens && ingredient.allergens.length > 0; else noAllergens">
+                    <span *ngFor="let allergen of ingredient.allergens" class="badge badge-allergen">
+                      {{ allergen }}
+                    </span>
+                  </ng-container>
+                  <ng-template #noAllergens>
+                    <span class="text-muted" style="font-size: 0.85rem;">Ninguno</span>
+                  </ng-template>
+                </td>
+                <td class="actions">
+                  <button class="btn btn-icon btn-edit" (click)="openEditModal(ingredient); $event.stopPropagation()"
+                    title="Editar">
+                    ✏️
+                  </button>
+                  <button class="btn btn-icon btn-delete"
+                    (click)="deleteIngredient(ingredient); $event.stopPropagation()" title="Eliminar">
+                    🗑️
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vista 2: Tabla Unificada -->
+  <div class="table-container" *ngIf="viewMode() === 'table'">
+    <table class="premium-table">
+      <thead>
+        <tr>
+          <th (click)="sortBy('name')" class="sortable">
+            Nombre <span class="sort-icon" *ngIf="sortColumn() === 'name'">{{ sortDirection() === 'asc' ? '▲' : '▼'
+              }}</span>
+          </th>
+          <th (click)="sortBy('calorias_100g')" class="sortable">
+            Kcal (100g) <span class="sort-icon" *ngIf="sortColumn() === 'calorias_100g'">{{ sortDirection() === 'desc' ?
+              '▼' : '▲' }}</span>
+          </th>
+          <th (click)="sortBy('proteinas_100g')" class="sortable">
+            Proteínas <span class="sort-icon" *ngIf="sortColumn() === 'proteinas_100g'">{{ sortDirection() === 'desc' ?
+              '▼' : '▲' }}</span>
+          </th>
+          <th (click)="sortBy('grasas_100g')" class="sortable">
+            Grasas <span class="sort-icon" *ngIf="sortColumn() === 'grasas_100g'">{{ sortDirection() === 'desc' ? '▼' :
+              '▲' }}</span>
+          </th>
+          <th (click)="sortBy('carbohidratos_100g')" class="sortable">
+            Carbs <span class="sort-icon" *ngIf="sortColumn() === 'carbohidratos_100g'">{{ sortDirection() === 'desc' ?
+              '▼' : '▲' }}</span>
+          </th>
+          <th (click)="sortBy('origen')" class="sortable">
+            Origen <span class="sort-icon" *ngIf="sortColumn() === 'origen'">{{ sortDirection() === 'asc' ? '▲' : '▼'
+              }}</span>
+          </th>
+          <th (click)="sortBy('categoria')" class="sortable">
+            Categoría <span class="sort-icon" *ngIf="sortColumn() === 'categoria'">{{ sortDirection() === 'asc' ? '▲' :
+              '▼' }}</span>
+          </th>
+          <th>Alérgenos</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let ingredient of filteredIngredients">
+          <td><strong>{{ ingredient.name }}</strong></td>
+          <td>{{ ingredient.calorias_100g }} kcal</td>
+          <td>{{ ingredient.proteinas_100g }}g</td>
+          <td>{{ ingredient.grasas_100g }}g</td>
+          <td>{{ ingredient.carbohidratos_100g }}g</td>
+          <td>
+            <span class="badge"
+              [ngClass]="ingredient.origen === 'animal' ? 'badge-origin-animal' : 'badge-origin-vegetal'">
+              {{ ingredient.origen }}
+            </span>
+          </td>
+          <td>
+            <span class="badge badge-category">{{ ingredient.categoria }}</span>
+          </td>
+          <td>
+            <ng-container *ngIf="ingredient.allergens && ingredient.allergens.length > 0; else noAllergens">
+              <span *ngFor="let allergen of ingredient.allergens" class="badge badge-allergen">
+                {{ allergen }}
+              </span>
+            </ng-container>
+            <ng-template #noAllergens>
+              <span class="text-muted" style="font-size: 0.85rem;">Ninguno</span>
+            </ng-template>
+          </td>
+          <td class="actions">
+            <button class="btn btn-icon btn-edit" (click)="openEditModal(ingredient)" title="Editar">
+              ✏️
+            </button>
+            <button class="btn btn-icon btn-delete" (click)="deleteIngredient(ingredient)" title="Eliminar">
+              🗑️
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredIngredients.length === 0">
+          <td colspan="9" class="text-center">No se encontraron ingredientes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal Crear/Editar -->
+  <div class="modal-overlay" *ngIf="showModal()">
+    <div class="modal-content form-scrollable">
+      <h3>{{ isEditing() ? 'Editar Ingrediente' : 'Crear Ingrediente' }}</h3>
+      <form (ngSubmit)="saveIngredient()">
+        <div class="form-group">
+          <label>Nombre del Ingrediente</label>
+          <input type="text" [ngModel]="currentIngredient.name" (ngModelChange)="currentIngredient.name = $event"
+            name="name" required class="form-control" placeholder="Ej. Pechuga de Pollo, Avena, Salmón...">
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Calorías (por 100g)</label>
+            <input type="number" step="0.1" [ngModel]="currentIngredient.calorias_100g"
+              (ngModelChange)="currentIngredient.calorias_100g = $event" name="calorias_100g" required
+              class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Proteínas (g)</label>
+            <input type="number" step="0.1" [ngModel]="currentIngredient.proteinas_100g"
+              (ngModelChange)="currentIngredient.proteinas_100g = $event" name="proteinas_100g" required
+              class="form-control">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Grasas (g)</label>
+            <input type="number" step="0.1" [ngModel]="currentIngredient.grasas_100g"
+              (ngModelChange)="currentIngredient.grasas_100g = $event" name="grasas_100g" required class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Carbohidratos (g)</label>
+            <input type="number" step="0.1" [ngModel]="currentIngredient.carbohidratos_100g"
+              (ngModelChange)="currentIngredient.carbohidratos_100g = $event" name="carbohidratos_100g" required
+              class="form-control">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Origen</label>
+            <select [ngModel]="currentIngredient.origen" (ngModelChange)="currentIngredient.origen = $event"
+              name="origen" class="form-control">
+              <option value="vegetal">Vegetal</option>
+              <option value="animal">Animal</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Categoría</label>
+            <select [ngModel]="currentIngredient.categoria" (ngModelChange)="currentIngredient.categoria = $event"
+              name="categoria" class="form-control">
+              <option *ngFor="let cat of existingCategories" [value]="cat">
+                {{ cat }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Alérgenos e Intolerancias Asociadas</label>
+          <div class="allergens-picker">
+            <label *ngFor="let allergen of availableAllergens()" class="allergen-checkbox-label">
+              <input type="checkbox" [checked]="isAllergenSelected(allergen.name)"
+                (change)="toggleAllergen(allergen.name)">
+              {{ allergen.name }}
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading()">
+            {{ isEditing() ? 'Guardar Cambios' : 'Crear Ingrediente' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

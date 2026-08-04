@@ -1,0 +1,179 @@
+<div class="recipe-management-container">
+  <div class="header">
+    <div class="title-section">
+      <h2>Gestión de Recetas</h2>
+      <p class="subtitle">Administra las recetas, sus ingredientes y macronutrientes calculados dinámicamente en Neo4j.</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <span class="icon">+</span> Nueva Receta
+    </button>
+  </div>
+
+  <!-- Error & Loading indicators -->
+  <div *ngIf="error()" class="alert alert-danger">
+    {{ error() }}
+  </div>
+
+  <!-- Search Bar -->
+  <div class="toolbar">
+    <div class="search-box">
+      <i class="search-icon">🔍</i>
+      <input
+        type="text"
+        placeholder="Buscar receta por nombre o descripción..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+    </div>
+    <div class="count-badge">
+      Total: {{ filteredRecipes.length }} recetas
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading()" class="loading-spinner">
+    Cargando recetas...
+  </div>
+
+  <!-- Recipes List / Grid -->
+  <div *ngIf="!isLoading() && filteredRecipes.length === 0" class="empty-state">
+    <p>No se encontraron recetas con el criterio de búsqueda.</p>
+  </div>
+
+  <div *ngIf="!isLoading() && filteredRecipes.length > 0" class="recipes-grid">
+    <div *ngFor="let recipe of filteredRecipes" class="recipe-card">
+      <div class="card-header">
+        <h3 class="recipe-title">{{ recipe.name }}</h3>
+        <div class="card-actions">
+          <button class="btn-icon edit" (click)="openEditModal(recipe)" title="Editar Receta">✏️</button>
+          <button class="btn-icon delete" (click)="deleteRecipe(recipe)" title="Eliminar Receta">🗑️</button>
+        </div>
+      </div>
+      
+      <p class="recipe-desc" *ngIf="recipe.description">{{ recipe.description }}</p>
+      
+      <!-- Macros Badges -->
+      <div class="macros-summary">
+        <span class="macro-badge kcal">{{ recipe.calories || 0 }} kcal</span>
+        <span class="macro-badge protein">P: {{ recipe.protein_g || 0 }}g</span>
+        <span class="macro-badge fat">G: {{ recipe.fat_g || 0 }}g</span>
+        <span class="macro-badge carbs">C: {{ recipe.carbs_g || 0 }}g</span>
+      </div>
+
+      <!-- Ingredients Pill List -->
+      <div class="ingredients-section">
+        <h4>Ingredientes ({{ recipe.ingredients?.length || 0 }}):</h4>
+        <div class="ingredients-tags">
+          <span *ngFor="let ing of recipe.ingredients" class="ing-tag">
+            {{ ing.name }} ({{ ing.grams }}g)
+          </span>
+          <span *ngIf="!recipe.ingredients || recipe.ingredients.length === 0" class="no-ings">
+            Sin ingredientes asignados
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Crear / Editar Receta -->
+<div class="modal-backdrop" *ngIf="showModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>{{ isEditing() ? 'Editar Receta' : 'Nueva Receta' }}</h3>
+      <button class="close-btn" (click)="closeModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="recipe-name">Nombre de la Receta *</label>
+        <input
+          id="recipe-name"
+          type="text"
+          class="form-control"
+          [(ngModel)]="currentRecipe.name"
+          placeholder="Ej: Pollo con Arroz"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="recipe-desc">Descripción</label>
+        <textarea
+          id="recipe-desc"
+          rows="2"
+          class="form-control"
+          [(ngModel)]="currentRecipe.description"
+          placeholder="Descripción o instrucciones breves de la receta..."
+        ></textarea>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Formulario para agregar ingrediente a la borrador -->
+      <div class="ingredients-builder">
+        <h4>Añadir Ingrediente a la Receta</h4>
+        <div class="add-ing-row">
+          <div class="ing-select">
+            <select class="form-control" [(ngModel)]="selectedIngredientName">
+              <option *ngFor="let ing of availableIngredients()" [value]="ing.name">
+                {{ ing.name }} ({{ ing.categoria }})
+              </option>
+            </select>
+          </div>
+          <div class="ing-grams">
+            <input
+              type="number"
+              min="1"
+              class="form-control"
+              [(ngModel)]="selectedIngredientGrams"
+              placeholder="Gramos"
+            />
+          </div>
+          <button class="btn btn-secondary" type="button" (click)="addIngredientToDraft()">
+            + Añadir
+          </button>
+        </div>
+
+        <!-- Tabla de ingredientes agregados al borrador -->
+        <div class="draft-ingredients-list">
+          <h5>Ingredientes Añadidos:</h5>
+          <div *ngIf="currentRecipe.ingredients.length === 0" class="empty-draft">
+            No se han añadido ingredientes a esta receta aún.
+          </div>
+          <table *ngIf="currentRecipe.ingredients.length > 0" class="draft-table">
+            <thead>
+              <tr>
+                <th>Ingrediente</th>
+                <th>Gramos</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of currentRecipe.ingredients; let i = index">
+                <td>{{ item.name }}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="1"
+                    class="form-control inline-grams"
+                    [(ngModel)]="item.grams"
+                  /> g
+                </td>
+                <td>
+                  <button class="btn-icon delete" (click)="removeIngredientFromDraft(i)" title="Quitar ingrediente">❌</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-cancel" (click)="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" (click)="saveRecipe()" [disabled]="!currentRecipe.name.trim()">
+        {{ isEditing() ? 'Guardar Cambios' : 'Crear Receta' }}
+      </button>
+    </div>
+  </div>
+</div>
