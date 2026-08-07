@@ -131,7 +131,7 @@ jobs:
       - name: Build user-auth-service Docker Image
         uses: docker/build-push-action@v6
         with:
-          context: ./services/user-auth-service
+          context: .
           file: ./services/user-auth-service/Dockerfile
           push: false
 
