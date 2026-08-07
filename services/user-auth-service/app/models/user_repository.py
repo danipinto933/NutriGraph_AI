@@ -23,25 +23,37 @@ class UserRepository:
             await self.driver.close()
             logger.info("Closed Neo4j connection")
 
-    async def create_user(self, email: str, hashed_password: str, first_name: str) -> bool:
+    async def create_user(self, email: str, hashed_password: str, first_name: str, is_verified: bool = False) -> bool:
         query = """
         CREATE (u:User {
             email: $email, 
             hashed_password: $hashed_password, 
             first_name: $first_name,
-            role: 'user'
+            role: 'user',
+            is_verified: $is_verified
         })
         RETURN u.email AS email
         """
         async with self.driver.session() as session:
-            result = await session.run(query, email=email, hashed_password=hashed_password, first_name=first_name)
+            result = await session.run(query, email=email, hashed_password=hashed_password, first_name=first_name, is_verified=is_verified)
+            record = await result.single()
+            return record is not None
+
+    async def verify_user_email(self, email: str) -> bool:
+        query = """
+        MATCH (u:User {email: $email})
+        SET u.is_verified = true
+        RETURN u.email AS email
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query, email=email)
             record = await result.single()
             return record is not None
 
     async def get_user_by_email(self, email: str) -> dict[str, Any] | None:
         query = """
         MATCH (u:User {email: $email})
-        RETURN u.email AS email, u.hashed_password AS hashed_password, u.first_name AS first_name, u.role AS role
+        RETURN u.email AS email, u.hashed_password AS hashed_password, u.first_name AS first_name, u.role AS role, coalesce(u.is_verified, false) AS is_verified
         """
         async with self.driver.session() as session:
             result = await session.run(query, email=email)
@@ -49,6 +61,7 @@ class UserRepository:
             if record:
                 return dict(record)
             return None
+
 
     async def update_user_biometrics(self, email: str, biometrics: dict[str, Any], intolerances: list[str]) -> bool:
         query_bio = """
@@ -511,6 +524,7 @@ class UserRepository:
                count(CASE WHEN u.sex = 'f' OR u.sex = 'female' THEN 1 END) AS females,
                count(CASE WHEN u.sex IS NULL OR u.sex = '' THEN 1 END) AS unspecified_sex,
                round(avg(u.weight_kg), 1) AS avg_weight_kg,
+               round(avg(u.height_cm), 1) AS avg_height_cm,
                round(avg(u.age_years), 1) AS avg_age_years,
                count(CASE WHEN u.weight_kg < 60 THEN 1 END) AS weight_under_60,
                count(CASE WHEN u.weight_kg >= 60 AND u.weight_kg < 75 THEN 1 END) AS weight_60_75,
@@ -565,6 +579,9 @@ class UserRepository:
                     "75 - 90 kg": user_data.get("weight_75_90", 0),
                     "> 90 kg": user_data.get("weight_over_90", 0)
                 }
+            },
+            "height_stats": {
+                "avg_height_cm": user_data.get("avg_height_cm", 0.0)
             },
             "age_stats": {
                 "avg_age_years": user_data.get("avg_age_years", 0.0),

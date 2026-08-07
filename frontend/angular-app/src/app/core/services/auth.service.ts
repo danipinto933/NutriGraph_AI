@@ -49,6 +49,10 @@ export class AuthService {
     this.isLoading.set(true);
     this.error.set(null);
     
+    // Clean any residual session cookies/storage before authenticating
+    this.clearCookiesAndStorage();
+    this.currentUser.set(null);
+    
     const payload = {
       email: credentials.email,
       password: credentials.password
@@ -67,7 +71,6 @@ export class AuthService {
       })
     );
   }
-
   // --- Register ---
   register(userData: any): Observable<any> {
     this.isLoading.set(true);
@@ -77,10 +80,43 @@ export class AuthService {
       catchError(err => {
         this.isLoading.set(false);
         this.error.set(err.error?.error || err.error?.detail || 'Error en el registro');
-        throw err;
+        return throwError(() => err);
       })
     );
   }
+
+  // --- Verify Email via Magic Link ---
+  verifyEmail(token: string): Observable<TokenResponse> {
+    this.isLoading.set(true);
+    this.error.set(null);
+    return this.http.get<TokenResponse>(`${this.apiUrl}/verify-email?token=${token}`).pipe(
+      tap(response => {
+        this.setToken(response.access_token);
+        this.fetchCurrentUser().subscribe();
+        this.isLoading.set(false);
+      }),
+      catchError(err => {
+        this.isLoading.set(false);
+        this.error.set(err.error?.detail || 'Error al verificar el correo electrónico');
+        return throwError(() => err);
+      })
+    );
+  }
+
+  // --- Resend Verification Email ---
+  resendVerification(email: string): Observable<any> {
+    this.isLoading.set(true);
+    this.error.set(null);
+    return this.http.post(`${this.apiUrl}/resend-verification`, { email }).pipe(
+      tap(() => this.isLoading.set(false)),
+      catchError(err => {
+        this.isLoading.set(false);
+        this.error.set(err.error?.detail || 'Error al reenviar el correo de verificación');
+        return throwError(() => err);
+      })
+    );
+  }
+
 
   submitOnboarding(data: any): Observable<any> {
     this.isLoading.set(true);
@@ -118,9 +154,34 @@ export class AuthService {
 
   // --- Logout ---
   logout(): void {
-    localStorage.removeItem('token');
+    this.clearCookiesAndStorage();
     this.currentUser.set(null);
     this.router.navigate(['/login']);
+  }
+
+  // --- Clean Cookies and Web Storage ---
+  public clearCookiesAndStorage(): void {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      if (typeof document !== 'undefined' && document.cookie) {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i];
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
+          if (name) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
+            if (typeof window !== 'undefined') {
+              document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname};`;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error clearing session cookies and storage:', e);
+    }
   }
 
   // --- Fetch current user info ---

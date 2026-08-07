@@ -1,7 +1,9 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './features/auth/login/login.component';
 import { RegisterComponent } from './features/auth/register/register.component';
+import { VerifyEmailComponent } from './features/auth/verify-email/verify-email.component';
 import { ChatComponent } from './features/chat/chat.component';
+
 import { OnboardingComponent } from './features/onboarding/onboarding.component';
 import { ProfileComponent } from './features/profile/profile.component';
 import { inject } from '@angular/core';
@@ -24,7 +26,9 @@ export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
+  { path: 'verify-email', component: VerifyEmailComponent },
   { path: 'onboarding', component: OnboardingComponent, canActivate: [authGuard] },
+
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },
   { path: 'chat', component: ChatComponent, canActivate: [authGuard] },
   { 

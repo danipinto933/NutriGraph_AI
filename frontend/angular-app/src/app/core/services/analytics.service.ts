@@ -14,6 +14,9 @@ export interface UserAnalytics {
     avg_weight_kg: number;
     distribution: Record<string, number>;
   };
+  height_stats?: {
+    avg_height_cm: number;
+  };
   age_stats: {
     avg_age_years: number;
     distribution: Record<string, number>;
@@ -25,6 +28,8 @@ export interface UserAnalytics {
 
 export interface GraphAnalytics {
   total_recipes: number;
+  total_ingredients?: number;
+  total_allergens?: number;
   top_ingredients_used: { ingredient: string; recipe_count: number }[];
   top_recipes: { name: string; ingredient_count: number }[];
   allergens_stats: { name: string; active_count: number }[];

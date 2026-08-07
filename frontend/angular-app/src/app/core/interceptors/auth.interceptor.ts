@@ -5,8 +5,8 @@ import { catchError, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const router = inject(Router);
-  const token = localStorage.getItem('token');
+  const authService = inject(AuthService);
+  const token = authService.getToken();
 
   let clonedRequest = req;
 
@@ -24,8 +24,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((error) => {
       // Handle 401 Unauthorized globally
       if (error.status === 401) {
-        localStorage.removeItem('token');
-        router.navigate(['/login']);
+        authService.logout();
       }
       return throwError(() => error);
     })

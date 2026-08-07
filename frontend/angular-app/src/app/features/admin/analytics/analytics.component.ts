@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AnalyticsService, CompleteAnalytics } from '../../../core/services/analytics.service';
@@ -26,6 +26,18 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
         </div>
       </header>
 
+      <!-- Category Selector Bar with Pill Tabs -->
+      <div class="category-selector-bar">
+        <div class="kpi-pills">
+          <button class="pill-btn" [class.active]="selectedCategory === 'all'" (click)="selectCategory('all')">📊 Vista BI Global</button>
+          <button class="pill-btn" [class.active]="selectedCategory === 'usuarios'" (click)="selectCategory('usuarios')">👥 KPIs Usuarios</button>
+          <button class="pill-btn" [class.active]="selectedCategory === 'alergenos'" (click)="selectCategory('alergenos')">🚫 KPIs Alérgenos</button>
+          <button class="pill-btn" [class.active]="selectedCategory === 'dietas'" (click)="selectCategory('dietas')">🏷️ Tipos de Dieta</button>
+          <button class="pill-btn" [class.active]="selectedCategory === 'alimentos'" (click)="selectCategory('alimentos')">🥦 KPIs Alimentos</button>
+          <button class="pill-btn" [class.active]="selectedCategory === 'recetas'" (click)="selectCategory('recetas')">🥗 KPIs Recetas</button>
+        </div>
+      </div>
+
       <!-- Loading / Error states -->
       <div *ngIf="loading()" class="loading-spinner">
         <div class="spinner"></div>
@@ -38,53 +50,53 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
       </div>
 
       <ng-container *ngIf="!loading() && data()">
-        <!-- Top KPI Cards -->
-        <div class="kpi-grid">
-          <div class="kpi-card users">
-            <div class="kpi-icon">👥</div>
-            <div class="kpi-info">
-              <span class="kpi-label">Usuarios Registrados</span>
-              <span class="kpi-value">{{ data()?.users?.total_users || 0 }}</span>
-              <span class="kpi-subtext">Edad media: {{ data()?.users?.age_stats?.avg_age_years || 0 }} años</span>
+
+        <!-- ==================== CATEGORY: ALL (GLOBAL OVERVIEW) ==================== -->
+        <ng-container *ngIf="selectedCategory === 'all'">
+          <!-- Top KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card users">
+              <div class="kpi-icon">👥</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Usuarios Registrados</span>
+                <span class="kpi-value">{{ data()?.users?.total_users || 0 }}</span>
+                <span class="kpi-subtext">Edad media: {{ data()?.users?.age_stats?.avg_age_years || 0 }} años</span>
+              </div>
+            </div>
+
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">🥗</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Recetas Activas</span>
+                <span class="kpi-value">{{ data()?.graph?.total_recipes || 0 }}</span>
+                <span class="kpi-subtext">Catálogo en Grafo Neo4j</span>
+              </div>
+            </div>
+
+            <div class="kpi-card latency">
+              <div class="kpi-icon">🥦</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Ingredientes</span>
+                <span class="kpi-value">{{ data()?.graph?.total_ingredients || data()?.graph?.top_ingredients_used?.length || 0 }}</span>
+                <span class="kpi-subtext">Registrados en Neo4j</span>
+              </div>
+            </div>
+
+            <div class="kpi-card conversations">
+              <div class="kpi-icon">💬</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Consultas Conversacionales</span>
+                <span class="kpi-value">{{ data()?.ai?.total_messages || 0 }}</span>
+                <span class="kpi-subtext">Sesiones: {{ data()?.ai?.total_conversations || 0 }}</span>
+              </div>
             </div>
           </div>
 
-          <div class="kpi-card recipes">
-            <div class="kpi-icon">🥗</div>
-            <div class="kpi-info">
-              <span class="kpi-label">Recetas Activas</span>
-              <span class="kpi-value">{{ data()?.graph?.total_recipes || 0 }}</span>
-              <span class="kpi-subtext">Catálogo en Grafo Neo4j</span>
-            </div>
-          </div>
-
-          <div class="kpi-card latency">
-            <div class="kpi-icon">⚡</div>
-            <div class="kpi-info">
-              <span class="kpi-label">Latencia Media IA</span>
-              <span class="kpi-value">{{ data()?.ai?.average_latency_ms || 185 }} ms</span>
-              <span class="kpi-subtext">Percentil 95: {{ data()?.ai?.p95_latency_ms || 340 }} ms</span>
-            </div>
-          </div>
-
-          <div class="kpi-card conversations">
-            <div class="kpi-icon">💬</div>
-            <div class="kpi-info">
-              <span class="kpi-label">Consultas Conversacionales</span>
-              <span class="kpi-value">{{ data()?.ai?.total_messages || 0 }}</span>
-              <span class="kpi-subtext">Sesiones: {{ data()?.ai?.total_conversations || 0 }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 1: Demografía y Biometría de Usuarios -->
-        <section class="dashboard-section">
-          <h3>👤 Demografía & Biometría de Usuarios</h3>
-          <div class="charts-grid-3">
-            
-            <!-- Sex Distribution Card -->
+          <!-- Summarized Sections Grid -->
+          <div class="charts-grid-2">
+            <!-- Sex & Demographics Summary -->
             <div class="chart-card">
-              <h4>🚻 Distribución por Sexo</h4>
+              <h4>🚻 Demografía de Usuarios</h4>
               <div class="sex-bar-wrapper" *ngIf="getSexPercent() as sex">
                 <div class="sex-bar">
                   <div class="bar-segment male" [style.width.%]="sex.malePercent" title="Hombres: {{sex.males}}"></div>
@@ -98,49 +110,11 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
               </div>
             </div>
 
-            <!-- Weight Distribution Card -->
+            <!-- Diet Types Summary -->
             <div class="chart-card">
-              <h4>⚖️ Distribución por Peso (kg)</h4>
-              <p class="card-subtitle">Peso Promedio: <strong>{{ data()?.users?.weight_stats?.avg_weight_kg || 0 }} kg</strong></p>
-              <div class="vertical-bars">
-                <div class="bar-group" *ngFor="let item of getObjectEntries(data()?.users?.weight_stats?.distribution)">
-                  <span class="bar-val">{{ item.value }}</span>
-                  <div class="v-bar-track">
-                    <div class="v-bar-fill weight" [style.height.%]="getBarPercent(item.value, getMaxWeightVal())"></div>
-                  </div>
-                  <span class="bar-key">{{ item.key }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Age Distribution Card -->
-            <div class="chart-card">
-              <h4>🎂 Distribución por Edad (Años)</h4>
-              <p class="card-subtitle">Edad Promedio: <strong>{{ data()?.users?.age_stats?.avg_age_years || 0 }} años</strong></p>
-              <div class="vertical-bars">
-                <div class="bar-group" *ngFor="let item of getObjectEntries(data()?.users?.age_stats?.distribution)">
-                  <span class="bar-val">{{ item.value }}</span>
-                  <div class="v-bar-track">
-                    <div class="v-bar-fill age" [style.height.%]="getBarPercent(item.value, getMaxAgeVal())"></div>
-                  </div>
-                  <span class="bar-key">{{ item.key }}</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </section>
-
-        <!-- Section 2: Dietas & Intolerancias Activadas -->
-        <section class="dashboard-section">
-          <h3>🥗 Dietas & Alérgenos Activados por Usuarios</h3>
-          <div class="charts-grid-2">
-            
-            <!-- Diet Types Distribution -->
-            <div class="chart-card">
-              <h4>🏷️ Tipos de Dieta Más Seleccionadas</h4>
+              <h4>🏷️ Top Dietas Seleccionadas</h4>
               <div class="list-bars" *ngIf="data()?.users?.diet_types_distribution?.length; else noDiets">
-                <div class="list-bar-item" *ngFor="let item of data()?.users?.diet_types_distribution">
+                <div class="list-bar-item" *ngFor="let item of data()?.users?.diet_types_distribution | slice:0:4">
                   <div class="item-info">
                     <span class="item-label">{{ item.diet_type }}</span>
                     <span class="item-count">{{ item.count }} usuarios</span>
@@ -151,69 +125,365 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
                 </div>
               </div>
               <ng-template #noDiets>
-                <p class="empty-msg">No hay dietas asignadas aún a los usuarios.</p>
+                <p class="empty-msg">No hay dietas asignadas aún.</p>
               </ng-template>
             </div>
+          </div>
+        </ng-container>
 
-            <!-- Intolerances & Allergens Distribution -->
-            <div class="chart-card">
-              <h4>🚫 Alérgenos e Intolerancias Bloqueadas</h4>
-              <div class="list-bars" *ngIf="data()?.users?.intolerances_distribution?.length; else noIntolerances">
-                <div class="list-bar-item" *ngFor="let item of data()?.users?.intolerances_distribution">
+        <!-- ==================== CATEGORY: USUARIOS ==================== -->
+        <ng-container *ngIf="selectedCategory === 'usuarios'">
+          <div class="kpi-grid">
+            <div class="kpi-card users">
+              <div class="kpi-icon">👥</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Usuarios</span>
+                <span class="kpi-value">{{ data()?.users?.total_users || 0 }}</span>
+                <span class="kpi-subtext">Usuarios registrados</span>
+              </div>
+            </div>
+
+            <div class="kpi-card weight">
+              <div class="kpi-icon">🎂</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Edad Media</span>
+                <span class="kpi-value">{{ data()?.users?.age_stats?.avg_age_years || 0 }}</span>
+                <span class="kpi-subtext">Años promedio</span>
+              </div>
+            </div>
+
+            <div class="kpi-card weight">
+              <div class="kpi-icon">⚖️</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Peso Promedio</span>
+                <span class="kpi-value">{{ data()?.users?.weight_stats?.avg_weight_kg || 0 }} kg</span>
+                <span class="kpi-subtext">Métrica corporal</span>
+              </div>
+            </div>
+
+            <div class="kpi-card height" *ngIf="data()?.users?.height_stats?.avg_height_cm">
+              <div class="kpi-icon">📏</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Altura Promedio</span>
+                <span class="kpi-value">{{ data()?.users?.height_stats?.avg_height_cm || 0 }} cm</span>
+                <span class="kpi-subtext">Estatura media</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="dashboard-section">
+            <h3>👤 Análisis Detallado de Usuarios & Biometría</h3>
+            <div class="charts-grid-3">
+
+              <!-- Sex Distribution -->
+              <div class="chart-card">
+                <h4>🚻 Distribución por Sexo</h4>
+                <div class="sex-bar-wrapper" *ngIf="getSexPercent() as sex">
+                  <div class="sex-bar">
+                    <div class="bar-segment male" [style.width.%]="sex.malePercent" title="Hombres: {{sex.males}}"></div>
+                    <div class="bar-segment female" [style.width.%]="sex.femalePercent" title="Mujeres: {{sex.females}}"></div>
+                    <div class="bar-segment unspecified" [style.width.%]="sex.unspecifiedPercent" title="No especificado"></div>
+                  </div>
+                  <div class="sex-legend">
+                    <span><span class="dot male"></span> Hombres ({{ sex.malePercent | number:'1.0-1' }}%)</span>
+                    <span><span class="dot female"></span> Mujeres ({{ sex.femalePercent | number:'1.0-1' }}%)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Weight Distribution -->
+              <div class="chart-card">
+                <h4>⚖️ Rango de Peso (kg)</h4>
+                <p class="card-subtitle">Promedio: <strong>{{ data()?.users?.weight_stats?.avg_weight_kg || 0 }} kg</strong></p>
+                <div class="vertical-bars">
+                  <div class="bar-group" *ngFor="let item of getObjectEntries(data()?.users?.weight_stats?.distribution)">
+                    <span class="bar-val">{{ item.value }}</span>
+                    <div class="v-bar-track">
+                      <div class="v-bar-fill weight" [style.height.%]="getBarPercent(item.value, getMaxWeightVal())"></div>
+                    </div>
+                    <span class="bar-key">{{ item.key }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Age Distribution -->
+              <div class="chart-card">
+                <h4>🎂 Rango de Edad (Años)</h4>
+                <p class="card-subtitle">Promedio: <strong>{{ data()?.users?.age_stats?.avg_age_years || 0 }} años</strong></p>
+                <div class="vertical-bars">
+                  <div class="bar-group" *ngFor="let item of getObjectEntries(data()?.users?.age_stats?.distribution)">
+                    <span class="bar-val">{{ item.value }}</span>
+                    <div class="v-bar-track">
+                      <div class="v-bar-fill age" [style.height.%]="getBarPercent(item.value, getMaxAgeVal())"></div>
+                    </div>
+                    <span class="bar-key">{{ item.key }}</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Activity Level Distribution -->
+            <div class="chart-card" *ngIf="data()?.users?.activity_stats">
+              <h4>🏃 Nivel de Actividad Física</h4>
+              <div class="list-bars">
+                <div class="list-bar-item" *ngFor="let item of getObjectEntries(data()?.users?.activity_stats)">
                   <div class="item-info">
-                    <span class="item-label">{{ item.intolerance }}</span>
+                    <span class="item-label">{{ item.key }}</span>
+                    <span class="item-count">{{ item.value }} usuarios</span>
+                  </div>
+                  <div class="h-bar-track">
+                    <div class="h-bar-fill activity" [style.width.%]="getBarPercent(item.value, getMaxActivityVal())"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </ng-container>
+
+        <!-- ==================== CATEGORY: ALÉRGENOS ==================== -->
+        <ng-container *ngIf="selectedCategory === 'alergenos'">
+          <div class="kpi-grid">
+            <div class="kpi-card allergen">
+              <div class="kpi-icon">🚫</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Alérgenos Catalogados</span>
+                <span class="kpi-value">{{ data()?.graph?.total_allergens || data()?.users?.intolerances_distribution?.length || 0 }}</span>
+                <span class="kpi-subtext">Nodos en Grafo Neo4j</span>
+              </div>
+            </div>
+
+            <div class="kpi-card allergen">
+              <div class="kpi-icon">⚠️</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Intolerancias Únicas</span>
+                <span class="kpi-value">{{ data()?.users?.intolerances_distribution?.length || 0 }}</span>
+                <span class="kpi-subtext">Seleccionadas por usuarios</span>
+              </div>
+            </div>
+
+            <div class="kpi-card allergen">
+              <div class="kpi-icon">🛡️</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Top Alérgeno Bloqueado</span>
+                <span class="kpi-value">{{ getTopAllergenName() }}</span>
+                <span class="kpi-subtext">Intolerancia más común</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="dashboard-section">
+            <h3>🚫 Métricas de Alérgenos & Restricciones Nutricionales</h3>
+            <div class="charts-grid-2">
+              
+              <!-- Intolerances Distribution -->
+              <div class="chart-card">
+                <h4>🚫 Alérgenos e Intolerancias Bloqueados por Usuarios</h4>
+                <div class="list-bars" *ngIf="data()?.users?.intolerances_distribution?.length; else noIntolerances">
+                  <div class="list-bar-item" *ngFor="let item of data()?.users?.intolerances_distribution">
+                    <div class="item-info">
+                      <span class="item-label">{{ item.intolerance }}</span>
+                      <span class="item-count">{{ item.count }} usuarios</span>
+                    </div>
+                    <div class="h-bar-track">
+                      <div class="h-bar-fill allergen" [style.width.%]="getBarPercent(item.count, getMaxIntoleranceCount())"></div>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noIntolerances>
+                  <p class="empty-msg">No se han registrado intolerancias activas aún en los perfiles de usuario.</p>
+                </ng-template>
+              </div>
+
+              <!-- Graph Allergen Stats -->
+              <div class="chart-card">
+                <h4>🛡️ Estado de Alérgenos en Grafo de Recetas</h4>
+                <div class="ranking-list" *ngIf="data()?.graph?.allergens_stats?.length; else noGraphAllergens">
+                  <div class="ranking-item" *ngFor="let item of data()?.graph?.allergens_stats; let i = index">
+                    <span class="rank-badge">#{{ i + 1 }}</span>
+                    <span class="rank-name">{{ item.name }}</span>
+                    <span class="rank-stat">{{ item.active_count }} restricciones activas</span>
+                  </div>
+                </div>
+                <ng-template #noGraphAllergens>
+                  <p class="empty-msg">No hay registros de alérgenos en el grafo nutricional.</p>
+                </ng-template>
+              </div>
+
+            </div>
+          </section>
+        </ng-container>
+
+        <!-- ==================== CATEGORY: ALIMENTOS ==================== -->
+        <ng-container *ngIf="selectedCategory === 'alimentos'">
+          <div class="kpi-grid">
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">🥦</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Ingredientes</span>
+                <span class="kpi-value">{{ data()?.graph?.total_ingredients || data()?.graph?.top_ingredients_used?.length || 0 }}</span>
+                <span class="kpi-subtext">En base de datos Neo4j</span>
+              </div>
+            </div>
+
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">🍳</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Ingrediente Más Usado</span>
+                <span class="kpi-value">{{ getTopIngredientName() }}</span>
+                <span class="kpi-subtext">En recetas del sistema</span>
+              </div>
+            </div>
+
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">🤖</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Alimento Más Solicitado (IA)</span>
+                <span class="kpi-value">{{ getTopAskedIngredientName() }}</span>
+                <span class="kpi-subtext">Menciones en chat</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="dashboard-section">
+            <h3>🥦 Insights de Alimentos & Ingredientes Nutricionales</h3>
+            <div class="charts-grid-2">
+              
+              <!-- Top Ingredients in Recipes -->
+              <div class="chart-card">
+                <h4>🍳 Top 10 Ingredientes Más Utilizados en Recetas</h4>
+                <div class="ranking-list" *ngIf="data()?.graph?.top_ingredients_used?.length; else noTopIng">
+                  <div class="ranking-item" *ngFor="let ing of data()?.graph?.top_ingredients_used; let i = index">
+                    <span class="rank-badge">#{{ i + 1 }}</span>
+                    <span class="rank-name">{{ ing.ingredient }}</span>
+                    <span class="rank-stat">{{ ing.recipe_count }} recetas</span>
+                  </div>
+                </div>
+                <ng-template #noTopIng>
+                  <p class="empty-msg">No hay ingredientes vinculados a recetas en el grafo.</p>
+                </ng-template>
+              </div>
+
+              <!-- Top Asked Ingredients to AI -->
+              <div class="chart-card">
+                <h4>🤖 Top 10 Alimentos/Ingredientes Preguntados al Agente IA</h4>
+                <div class="ranking-list" *ngIf="data()?.ai?.top_asked_ingredients?.length; else noAiIng">
+                  <div class="ranking-item ai" *ngFor="let item of data()?.ai?.top_asked_ingredients; let i = index">
+                    <span class="rank-badge ai">#{{ i + 1 }}</span>
+                    <span class="rank-name">{{ item.keyword | titlecase }}</span>
+                    <span class="rank-stat">{{ item.count }} menciones</span>
+                  </div>
+                </div>
+                <ng-template #noAiIng>
+                  <p class="empty-msg">No se registraron consultas de alimentos en las sesiones del chat.</p>
+                </ng-template>
+              </div>
+
+            </div>
+          </section>
+        </ng-container>
+
+        <!-- ==================== CATEGORY: RECETAS ==================== -->
+        <ng-container *ngIf="selectedCategory === 'recetas'">
+          <div class="kpi-grid">
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">🥗</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Recetas Activas</span>
+                <span class="kpi-value">{{ data()?.graph?.total_recipes || 0 }}</span>
+                <span class="kpi-subtext">Catálogo en Grafo Neo4j</span>
+              </div>
+            </div>
+
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">📊</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Promedio Ingredientes/Receta</span>
+                <span class="kpi-value">{{ getAvgIngredientsPerRecipe() | number:'1.0-1' }}</span>
+                <span class="kpi-subtext">Densidad promedio</span>
+              </div>
+            </div>
+
+            <div class="kpi-card recipes">
+              <div class="kpi-icon">🏆</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Receta Top Complejidad</span>
+                <span class="kpi-value">{{ getTopRecipeWithMostIngredients() }}</span>
+                <span class="kpi-subtext">Mayor cantidad de ingredientes</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="dashboard-section">
+            <h3>🥗 Análisis de Recetas & Grafo Nutricional</h3>
+            <div class="chart-card">
+              <h4>📖 Top Recetas por Densidad de Ingredientes</h4>
+              <div class="ranking-list" *ngIf="data()?.graph?.top_recipes?.length; else noTopRecipes">
+                <div class="ranking-item" *ngFor="let recipe of data()?.graph?.top_recipes; let i = index">
+                  <span class="rank-badge">#{{ i + 1 }}</span>
+                  <span class="rank-name">{{ recipe.name }}</span>
+                  <span class="rank-stat">{{ recipe.ingredient_count }} ingredientes</span>
+                </div>
+              </div>
+              <ng-template #noTopRecipes>
+                <p class="empty-msg">No se encontraron recetas cargadas en la base de datos.</p>
+              </ng-template>
+            </div>
+          </section>
+        </ng-container>
+
+        <!-- ==================== CATEGORY: DIETAS ==================== -->
+        <ng-container *ngIf="selectedCategory === 'dietas'">
+          <div class="kpi-grid">
+            <div class="kpi-card users">
+              <div class="kpi-icon">🏷️</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Tipos de Dieta Activos</span>
+                <span class="kpi-value">{{ data()?.users?.diet_types_distribution?.length || 0 }}</span>
+                <span class="kpi-subtext">Preferencias configuradas</span>
+              </div>
+            </div>
+
+            <div class="kpi-card users">
+              <div class="kpi-icon">🥇</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Dieta Más Seleccionada</span>
+                <span class="kpi-value">{{ getTopDietName() }}</span>
+                <span class="kpi-subtext">Preferencia principal</span>
+              </div>
+            </div>
+
+            <div class="kpi-card users">
+              <div class="kpi-icon">📊</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Usuarios con Dieta</span>
+                <span class="kpi-value">{{ getTotalUsersWithDiet() }}</span>
+                <span class="kpi-subtext">Preferencias asignadas</span>
+              </div>
+            </div>
+          </div>
+
+          <section class="dashboard-section">
+            <h3>🏷️ Métricas de Tipos de Dieta & Preferencias</h3>
+            <div class="chart-card">
+              <h4>🏷️ Distribución de Tipos de Dieta Seleccionadas</h4>
+              <div class="list-bars" *ngIf="data()?.users?.diet_types_distribution?.length; else noDietTypes">
+                <div class="list-bar-item" *ngFor="let item of data()?.users?.diet_types_distribution">
+                  <div class="item-info">
+                    <span class="item-label">{{ item.diet_type }}</span>
                     <span class="item-count">{{ item.count }} usuarios</span>
                   </div>
                   <div class="h-bar-track">
-                    <div class="h-bar-fill allergen" [style.width.%]="getBarPercent(item.count, getMaxIntoleranceCount())"></div>
+                    <div class="h-bar-fill diet" [style.width.%]="getBarPercent(item.count, getMaxDietCount())"></div>
                   </div>
                 </div>
               </div>
-              <ng-template #noIntolerances>
-                <p class="empty-msg">No se han registrado intolerancias activas aún.</p>
+              <ng-template #noDietTypes>
+                <p class="empty-msg">No hay usuarios con tipos de dieta asignados aún.</p>
               </ng-template>
             </div>
-
-          </div>
-        </section>
-
-        <!-- Section 3: Ingredientes & Recetas Insights -->
-        <section class="dashboard-section">
-          <h3>🥦 Insights de Ingredientes & Recetas</h3>
-          <div class="charts-grid-2">
-            
-            <!-- Top Ingredients in Recipes -->
-            <div class="chart-card">
-              <h4>🍳 Ingredientes Más Usados en Recetas</h4>
-              <div class="ranking-list" *ngIf="data()?.graph?.top_ingredients_used?.length; else noTopIng">
-                <div class="ranking-item" *ngFor="let ing of data()?.graph?.top_ingredients_used; let i = index">
-                  <span class="rank-badge">#{{ i + 1 }}</span>
-                  <span class="rank-name">{{ ing.ingredient }}</span>
-                  <span class="rank-stat">{{ ing.recipe_count }} recetas</span>
-                </div>
-              </div>
-              <ng-template #noTopIng>
-                <p class="empty-msg">No hay recetas cargadas en el grafo.</p>
-              </ng-template>
-            </div>
-
-            <!-- Top Asked Ingredients to AI -->
-            <div class="chart-card">
-              <h4>🤖 Ingredientes Más Preguntados al Agente IA</h4>
-              <div class="ranking-list" *ngIf="data()?.ai?.top_asked_ingredients?.length; else noAiIng">
-                <div class="ranking-item ai" *ngFor="let item of data()?.ai?.top_asked_ingredients; let i = index">
-                  <span class="rank-badge ai">#{{ i + 1 }}</span>
-                  <span class="rank-name">{{ item.keyword | titlecase }}</span>
-                  <span class="rank-stat">{{ item.count }} menciones</span>
-                </div>
-              </div>
-              <ng-template #noAiIng>
-                <p class="empty-msg">No se registraron menciones de alimentos en el chat aún.</p>
-              </ng-template>
-            </div>
-
-          </div>
-        </section>
+          </section>
+        </ng-container>
 
       </ng-container>
     </div>
@@ -265,6 +535,79 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
       font-size: 0.9rem;
     }
 
+    /* Category Selector Bar */
+    .category-selector-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface-color, #1e1e1e);
+      border: 1px solid var(--border-color, #333);
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .kpi-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      width: 100%;
+    }
+
+    .pill-btn {
+      background: #2a2a2a;
+      color: var(--text-muted, #b3b3b3);
+      border: 1px solid var(--border-color, #444);
+      padding: 0.55rem 1.1rem;
+      border-radius: 20px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .pill-btn:hover {
+      background: #333;
+      color: #fff;
+      border-color: var(--primary-color, #bb86fc);
+      transform: translateY(-1px);
+    }
+
+    .pill-btn.active {
+      background: linear-gradient(135deg, rgba(187, 134, 252, 0.22), rgba(3, 218, 198, 0.22));
+      color: #03dac6;
+      border-color: #03dac6;
+      box-shadow: 0 0 10px rgba(3, 218, 198, 0.25);
+    }
+
+    .category-selector-bar label {
+      color: var(--primary-color, #bb86fc);
+      font-size: 0.95rem;
+    }
+
+    .kpi-select {
+      flex: 1;
+      max-width: 420px;
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid var(--border-color, #444);
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .kpi-select:focus, .kpi-select:hover {
+      border-color: var(--primary-color, #bb86fc);
+      box-shadow: 0 0 0 2px rgba(187, 134, 252, 0.2);
+    }
+
     /* KPI Grid */
     .kpi-grid {
       display: grid;
@@ -306,7 +649,7 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
     }
 
     .kpi-value {
-      font-size: 1.8rem;
+      font-size: 1.6rem;
       font-weight: 700;
       color: #fff;
     }
@@ -486,6 +829,7 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
 
     .h-bar-fill.diet { background: #03dac6; }
     .h-bar-fill.allergen { background: #cf6679; }
+    .h-bar-fill.activity { background: #bb86fc; }
 
     /* Ranking Lists */
     .ranking-list {
@@ -568,12 +912,20 @@ import { AnalyticsService, CompleteAnalytics } from '../../../core/services/anal
   `]
 })
 export class AnalyticsComponent implements OnInit {
-  timeRange = 'all';
+  @Input() selectedCategory: string = 'all';
+  @Output() selectedCategoryChange = new EventEmitter<string>();
+
+  timeRange: string = 'all';
   loading = signal<boolean>(true);
   error = signal<string | null>(null);
   data = signal<CompleteAnalytics | null>(null);
 
   constructor(private analyticsService: AnalyticsService) {}
+
+  selectCategory(cat: string): void {
+    this.selectedCategory = cat;
+    this.selectedCategoryChange.emit(cat);
+  }
 
   ngOnInit(): void {
     this.loadData();
@@ -639,6 +991,12 @@ export class AnalyticsComponent implements OnInit {
     return Math.max(...Object.values(dist), 1);
   }
 
+  getMaxActivityVal(): number {
+    const dist = this.data()?.users?.activity_stats;
+    if (!dist) return 1;
+    return Math.max(...Object.values(dist), 1);
+  }
+
   getMaxDietCount(): number {
     const diets = this.data()?.users?.diet_types_distribution;
     if (!diets || !diets.length) return 1;
@@ -649,5 +1007,60 @@ export class AnalyticsComponent implements OnInit {
     const into = this.data()?.users?.intolerances_distribution;
     if (!into || !into.length) return 1;
     return Math.max(...into.map(i => i.count), 1);
+  }
+
+  getTopAllergenName(): string {
+    const into = this.data()?.users?.intolerances_distribution;
+    if (into && into.length > 0) {
+      return into[0].intolerance;
+    }
+    const graphAll = this.data()?.graph?.allergens_stats;
+    if (graphAll && graphAll.length > 0) {
+      return graphAll[0].name;
+    }
+    return 'Ninguno';
+  }
+
+  getTopIngredientName(): string {
+    const topIng = this.data()?.graph?.top_ingredients_used;
+    if (topIng && topIng.length > 0) {
+      return topIng[0].ingredient;
+    }
+    return 'N/A';
+  }
+
+  getTopAskedIngredientName(): string {
+    const asked = this.data()?.ai?.top_asked_ingredients;
+    if (asked && asked.length > 0) {
+      return asked[0].keyword;
+    }
+    return 'N/A';
+  }
+
+  getTopDietName(): string {
+    const diets = this.data()?.users?.diet_types_distribution;
+    if (diets && diets.length > 0) {
+      return diets[0].diet_type;
+    }
+    return 'Ninguna';
+  }
+
+  getTotalUsersWithDiet(): number {
+    const diets = this.data()?.users?.diet_types_distribution;
+    if (!diets) return 0;
+    return diets.reduce((acc, d) => acc + d.count, 0);
+  }
+
+  getAvgIngredientsPerRecipe(): number {
+    const top = this.data()?.graph?.top_recipes;
+    if (!top || top.length === 0) return 0;
+    const totalSum = top.reduce((acc, r) => acc + r.ingredient_count, 0);
+    return totalSum / top.length;
+  }
+
+  getTopRecipeWithMostIngredients(): string {
+    const top = this.data()?.graph?.top_recipes;
+    if (!top || top.length === 0) return 'N/A';
+    return top[0].name;
   }
 }

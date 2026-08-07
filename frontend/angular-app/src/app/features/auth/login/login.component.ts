@@ -16,6 +16,11 @@ import { AuthService } from '../../../core/services/auth.service';
         
         <div *ngIf="authService.error()" class="error-alert">
           {{ authService.error() }}
+          <div *ngIf="isUnverifiedError()" class="resend-box">
+            <button type="button" class="btn-link" (click)="onResendVerification()">
+              {{ resendMessage() || 'Reenviar correo de verificación' }}
+            </button>
+          </div>
         </div>
         
         <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
@@ -93,11 +98,24 @@ import { AuthService } from '../../../core/services/auth.service';
     }
     .error-alert {
       background: rgba(239, 68, 68, 0.1);
-      color: var(--error);
+      color: var(--error, #ef4444);
       padding: 0.75rem;
-      border-radius: var(--border-radius-sm);
+      border-radius: var(--border-radius-sm, 8px);
       margin-bottom: 1.5rem;
       border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .resend-box {
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px dashed rgba(239, 68, 68, 0.3);
+    }
+    .btn-link {
+      background: none;
+      border: none;
+      color: #00d2ff;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.85rem;
     }
     .footer-text {
       margin-top: 2rem;
@@ -111,15 +129,32 @@ export class LoginComponent {
   public authService = inject(AuthService);
   private router = inject(Router);
 
+  public resendMessage = signal<string | null>(null);
+
   loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required]
   });
 
-  constructor() {}
+  isUnverifiedError(): boolean {
+    const err = this.authService.error() || '';
+    return err.toLowerCase().includes('verificar');
+  }
+
+  onResendVerification(): void {
+    const email = this.loginForm.value.email;
+    if (email) {
+      this.authService.resendVerification(email).subscribe({
+        next: (res: any) => {
+          this.resendMessage.set(res.message || 'Correo enviado');
+        }
+      });
+    }
+  }
 
   onSubmit(): void {
     if (this.loginForm.valid) {
+      this.resendMessage.set(null);
       this.authService.login(this.loginForm.value).subscribe({
         next: () => this.router.navigate(['/chat'])
       });

@@ -159,11 +159,25 @@ class RecipeService:
         query_total = """
         MATCH (r:Recipe) RETURN count(r) AS total_recipes
         """
+        query_total_ing = """
+        MATCH (i:Ingredient) RETURN count(i) AS total_ingredients
+        """
+        query_total_all = """
+        MATCH (a:Allergen) RETURN count(a) AS total_allergens
+        """
 
         async with driver.session() as session:
             res_total = await session.run(query_total)
             rec_total = await res_total.single()
             total_recipes = rec_total["total_recipes"] if rec_total else 0
+
+            res_t_ing = await session.run(query_total_ing)
+            rec_t_ing = await res_t_ing.single()
+            total_ingredients = rec_t_ing["total_ingredients"] if rec_t_ing else 0
+
+            res_t_all = await session.run(query_total_all)
+            rec_t_all = await res_t_all.single()
+            total_allergens = rec_t_all["total_allergens"] if rec_t_all else 0
 
             res_ing = await session.run(query_top_ingredients)
             top_ingredients = [dict(record) for record in await res_ing.data()]
@@ -176,6 +190,8 @@ class RecipeService:
 
         return {
             "total_recipes": total_recipes,
+            "total_ingredients": total_ingredients,
+            "total_allergens": total_allergens,
             "top_ingredients_used": top_ingredients,
             "top_recipes": top_recipes,
             "allergens_stats": allergens_stats

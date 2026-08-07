@@ -70,7 +70,7 @@ import { AnalyticsComponent } from './analytics/analytics.component';
       
       <main class="admin-content">
         <ng-container *ngIf="currentTab === 'analisis'">
-          <app-analytics></app-analytics>
+          <app-analytics [(selectedCategory)]="selectedKpiCategory"></app-analytics>
         </ng-container>
         <ng-container *ngIf="currentTab === 'usuarios'">
           <app-user-management></app-user-management>
@@ -115,7 +115,7 @@ import { AnalyticsComponent } from './analytics/analytics.component';
     .sidebar-header h2 {
       margin: 0;
       font-size: 1.5rem;
-      background: linear-gradient(90deg, #bb86fc, #3700b3);
+      background: linear-gradient(90deg, #bb86fc, #03dac6);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -137,6 +137,7 @@ import { AnalyticsComponent } from './analytics/analytics.component';
       text-decoration: none;
       border-radius: 8px;
       transition: background-color 0.3s ease, color 0.3s ease;
+      font-weight: 500;
     }
     
     .sidebar-nav a:hover, .sidebar-nav li.active a {
@@ -182,5 +183,7 @@ import { AnalyticsComponent } from './analytics/analytics.component';
 
 export class AdminComponent {
   currentTab = 'analisis';
+  selectedKpiCategory = 'all';
 }
+
 

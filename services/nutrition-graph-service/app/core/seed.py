@@ -217,8 +217,8 @@ async def run_seed(driver: AsyncDriver):
     query_clear = "MATCH (n) DETACH DELETE n"
 
     query_admin_and_allergens = """
-    // 1. Crear usuario Admin (sin biometría inicial)
-    CREATE (:User {email: 'admin@gmail.com', hashed_password: '$2b$12$IiBfwlvs/w4uDqPeLvS5/uNB.vzk9lLNbtooBmGyiQGYi8nZXYClO', first_name: 'Admin', role: 'admin'});
+    // 1. Crear usuarios Admin (verificados por defecto)
+    CREATE (:User {email: 'danipinto933@gmail.com', hashed_password: '$2b$12$.eeZA9GjfYfi2lbLvmQMnuOg8eZ19VWHiBA8uwZZGaW1ZyCJzHLfO', first_name: 'Dani', role: 'admin', is_verified: true});
 
     // 2. Crear Alérgenos Base
     UNWIND [
@@ -244,7 +244,8 @@ async def run_seed(driver: AsyncDriver):
         bmi: u.bmi,
         bmr: u.bmr,
         tdee: u.tdee,
-        diet_type: u.diet_type
+        diet_type: u.diet_type,
+        is_verified: true
     });
     """
 

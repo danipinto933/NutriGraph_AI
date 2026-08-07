@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -11,74 +11,113 @@ import { AuthService } from '../../../core/services/auth.service';
   template: `
     <div class="auth-container animate-fade-in">
       <div class="glass-panel auth-card">
-        <h1 class="text-gradient">Crear Cuenta</h1>
-        <p class="subtitle">Únete a NutriGraph AI y descubre tu dieta ideal.</p>
         
-        <div *ngIf="authService.error()" class="error-alert">
-          {{ authService.error() }}
-        </div>
-        
-        <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-          <div class="form-group">
-            <label for="first_name">Nombre Completo</label>
-            <input 
-              type="text" 
-              id="first_name" 
-              class="input-glass" 
-              formControlName="first_name" 
-              placeholder="Juan Pérez"
-            >
-            <div *ngIf="registerForm.get('first_name')?.touched && registerForm.get('first_name')?.invalid" class="validation-error">
-              <small *ngIf="registerForm.get('first_name')?.errors?.['required']">El nombre es obligatorio.</small>
-              <small *ngIf="registerForm.get('first_name')?.errors?.['minlength']">Mínimo 2 caracteres.</small>
-              <small *ngIf="registerForm.get('first_name')?.errors?.['pattern']">No puede contener números ni símbolos.</small>
+        <!-- Registration Form View -->
+        <ng-container *ngIf="!isRegistered()">
+          <h1 class="text-gradient">Crear Cuenta</h1>
+          <p class="subtitle">Únete a NutriGraph AI y descubre tu dieta ideal.</p>
+          
+          <div *ngIf="authService.error()" class="error-alert">
+            {{ authService.error() }}
+          </div>
+          
+          <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+            <div class="form-group">
+              <label for="first_name">Nombre Completo</label>
+              <input 
+                type="text" 
+                id="first_name" 
+                class="input-glass" 
+                formControlName="first_name" 
+                placeholder="Juan Pérez"
+              >
+              <div *ngIf="registerForm.get('first_name')?.touched && registerForm.get('first_name')?.invalid" class="validation-error">
+                <small *ngIf="registerForm.get('first_name')?.errors?.['required']">El nombre es obligatorio.</small>
+                <small *ngIf="registerForm.get('first_name')?.errors?.['minlength']">Mínimo 2 caracteres.</small>
+                <small *ngIf="registerForm.get('first_name')?.errors?.['pattern']">No puede contener números ni símbolos.</small>
+              </div>
             </div>
+
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input 
+                type="email" 
+                id="email" 
+                class="input-glass" 
+                formControlName="email" 
+                placeholder="tu@email.com"
+              >
+              <div *ngIf="registerForm.get('email')?.touched && registerForm.get('email')?.invalid" class="validation-error">
+                <small *ngIf="registerForm.get('email')?.errors?.['required']">El email es obligatorio.</small>
+                <small *ngIf="registerForm.get('email')?.errors?.['email']">Formato de email inválido.</small>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="password">Contraseña</label>
+              <input 
+                type="password" 
+                id="password" 
+                class="input-glass" 
+                formControlName="password" 
+                placeholder="••••••••"
+              >
+              <div *ngIf="registerForm.get('password')?.touched && registerForm.get('password')?.invalid" class="validation-error">
+                <small *ngIf="registerForm.get('password')?.errors?.['required']">La contraseña es obligatoria.</small>
+                <small *ngIf="registerForm.get('password')?.errors?.['minlength']">Mínimo 8 caracteres.</small>
+                <small *ngIf="registerForm.get('password')?.errors?.['maxlength']">Máximo 24 caracteres.</small>
+                <small *ngIf="registerForm.get('password')?.errors?.['pattern']">Debe contener al menos una mayúscula y un número.</small>
+              </div>
+            </div>
+            
+            <button 
+              type="submit" 
+              class="btn-primary w-full" 
+              [disabled]="registerForm.invalid || authService.isLoading()"
+            >
+              {{ authService.isLoading() ? 'Registrando...' : 'Registrarse' }}
+            </button>
+          </form>
+          
+          <p class="footer-text">
+            ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
+          </p>
+        </ng-container>
+
+        <!-- Verification Pending View -->
+        <ng-container *ngIf="isRegistered()">
+          <div class="email-icon">✉️</div>
+          <h1 class="text-gradient">¡Verifica tu Correo!</h1>
+          <p class="subtitle">
+            Hemos enviado un enlace de doble autorización a <strong class="highlight-email">{{ registeredEmail() }}</strong>.
+          </p>
+          
+          <p class="info-text">
+            Por favor, revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta y acceder a NutriGraph AI.
+          </p>
+
+          <div *ngIf="resendSuccess()" class="success-alert">
+            {{ resendSuccess() }}
+          </div>
+          
+          <div *ngIf="authService.error()" class="error-alert">
+            {{ authService.error() }}
           </div>
 
-          <div class="form-group">
-            <label for="email">Email</label>
-            <input 
-              type="email" 
-              id="email" 
-              class="input-glass" 
-              formControlName="email" 
-              placeholder="tu@email.com"
-            >
-            <div *ngIf="registerForm.get('email')?.touched && registerForm.get('email')?.invalid" class="validation-error">
-              <small *ngIf="registerForm.get('email')?.errors?.['required']">El email es obligatorio.</small>
-              <small *ngIf="registerForm.get('email')?.errors?.['email']">Formato de email inválido.</small>
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label for="password">Contraseña</label>
-            <input 
-              type="password" 
-              id="password" 
-              class="input-glass" 
-              formControlName="password" 
-              placeholder="••••••••"
-            >
-            <div *ngIf="registerForm.get('password')?.touched && registerForm.get('password')?.invalid" class="validation-error">
-              <small *ngIf="registerForm.get('password')?.errors?.['required']">La contraseña es obligatoria.</small>
-              <small *ngIf="registerForm.get('password')?.errors?.['minlength']">Mínimo 8 caracteres.</small>
-              <small *ngIf="registerForm.get('password')?.errors?.['maxlength']">Máximo 24 caracteres.</small>
-              <small *ngIf="registerForm.get('password')?.errors?.['pattern']">Debe contener al menos una mayúscula y un número.</small>
-            </div>
-          </div>
-          
           <button 
-            type="submit" 
-            class="btn-primary w-full" 
-            [disabled]="registerForm.invalid || authService.isLoading()"
+            type="button" 
+            class="btn-secondary w-full" 
+            (click)="onResend()" 
+            [disabled]="authService.isLoading()"
           >
-            {{ authService.isLoading() ? 'Registrando...' : 'Registrarse' }}
+            {{ authService.isLoading() ? 'Enviando...' : 'Reenviar correo de verificación' }}
           </button>
-        </form>
-        
-        <p class="footer-text">
-          ¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a>
-        </p>
+
+          <p class="footer-text">
+            <a routerLink="/login">Volver a iniciar sesión</a>
+          </p>
+        </ng-container>
+
       </div>
     </div>
   `,
@@ -100,8 +139,22 @@ import { AuthService } from '../../../core/services/auth.service';
     }
     .subtitle {
       color: var(--text-secondary);
-      margin-bottom: 2rem;
-      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .info-text {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.4;
+    }
+    .highlight-email {
+      color: #00d2ff;
+    }
+    .email-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
     }
     .form-group {
       text-align: left;
@@ -119,11 +172,33 @@ import { AuthService } from '../../../core/services/auth.service';
     }
     .error-alert {
       background: rgba(239, 68, 68, 0.1);
-      color: var(--error);
+      color: var(--error, #ef4444);
       padding: 0.75rem;
-      border-radius: var(--border-radius-sm);
+      border-radius: var(--border-radius-sm, 8px);
       margin-bottom: 1.5rem;
       border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .success-alert {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      padding: 0.75rem;
+      border-radius: var(--border-radius-sm, 8px);
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--border-radius-sm, 8px);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #00d2ff;
     }
     .footer-text {
       margin-top: 2rem;
@@ -131,7 +206,7 @@ import { AuthService } from '../../../core/services/auth.service';
       color: var(--text-secondary);
     }
     .validation-error {
-      color: var(--error);
+      color: var(--error, #ef4444);
       font-size: 0.8rem;
       margin-top: 0.25rem;
       display: flex;
@@ -144,28 +219,38 @@ export class RegisterComponent {
   public authService = inject(AuthService);
   private router = inject(Router);
 
+  public isRegistered = signal<boolean>(false);
+  public registeredEmail = signal<string>('');
+  public resendSuccess = signal<string | null>(null);
+
   registerForm = this.fb.group({
     first_name: ['', [Validators.required, Validators.minLength(2), Validators.pattern('^[a-zA-ZñÑáéíóúÁÉÍÓÚ\\s]+$')]],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(24), Validators.pattern('^(?=.*[A-Z])(?=.*[0-9]).*$')]]
   });
 
-  constructor() {}
-
   onSubmit(): void {
     if (this.registerForm.valid) {
+      const email = this.registerForm.value.email || '';
       this.authService.register(this.registerForm.value).subscribe({
         next: () => {
-          // Auto login after register
-          const credentials = {
-            email: this.registerForm.value.email,
-            password: this.registerForm.value.password
-          };
-          this.authService.login(credentials).subscribe({
-            next: () => this.router.navigate(['/onboarding'])
-          });
+          this.registeredEmail.set(email);
+          this.isRegistered.set(true);
+        }
+      });
+    }
+  }
+
+  onResend(): void {
+    const email = this.registeredEmail();
+    if (email) {
+      this.resendSuccess.set(null);
+      this.authService.resendVerification(email).subscribe({
+        next: (res) => {
+          this.resendSuccess.set(res.message || 'Correo reenviado correctamente');
         }
       });
     }
   }
 }
+

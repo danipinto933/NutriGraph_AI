@@ -39,3 +39,20 @@ class UserNotFoundException(DomainException):
             detail="User not found",
             context={"email": email}
         )
+
+class UserNotVerifiedException(DomainException):
+    def __init__(self, email: str = ""):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debes verificar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada o solicita un nuevo enlace.",
+            context={"email": email}
+        )
+
+class InvalidVerificationTokenException(DomainException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El enlace de verificación es inválido o ha expirado.",
+            context={}
+        )
+

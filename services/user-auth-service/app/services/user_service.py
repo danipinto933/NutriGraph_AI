@@ -3,16 +3,25 @@ from app.core.exceptions import (
     UserAlreadyExistsException,
     UserNotFoundException,
     EmailNotRegisteredException,
+    UserNotVerifiedException,
+    InvalidVerificationTokenException,
 )
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import (
+    create_access_token,
+    create_verification_token,
+    get_password_hash,
+    verify_email_token,
+    verify_password,
+)
 from app.kafka.producer import producer
 from app.models.user_repository import user_repository
 from app.schemas.auth import Login, Token
-from app.schemas.user import UserCreate, UserOnboarding, UserResponse
+from app.schemas.user import UserCreate, UserOnboarding, UserRegisterResponse, UserResponse
 from app.services.biometrics import get_biometric_profile
+from app.services.email_service import email_service
 
 
-async def register_user(user_in: UserCreate) -> UserResponse:
+async def register_user(user_in: UserCreate) -> UserRegisterResponse:
     existing_user = await user_repository.get_user_by_email(user_in.email)
     if existing_user:
         raise UserAlreadyExistsException(email=user_in.email)
@@ -21,16 +30,58 @@ async def register_user(user_in: UserCreate) -> UserResponse:
     await user_repository.create_user(
         email=user_in.email, 
         hashed_password=hashed_password, 
-        first_name=user_in.first_name
+        first_name=user_in.first_name,
+        is_verified=False
     )
+    
+    verification_token = create_verification_token(user_in.email)
+    await email_service.send_verification_email(
+        to_email=user_in.email,
+        first_name=user_in.first_name,
+        verification_token=verification_token
+    )
+    
+    return UserRegisterResponse(
+        message="Usuario registrado correctamente. Por favor revisa tu correo electrónico para activar tu cuenta.",
+        email=user_in.email,
+        is_verified=False
+    )
+
+async def verify_user_email(token: str) -> Token:
+    email = verify_email_token(token)
+    if not email:
+        raise InvalidVerificationTokenException()
+        
+    user = await user_repository.get_user_by_email(email)
+    if not user:
+        raise UserNotFoundException(email=email)
+        
+    await user_repository.verify_user_email(email)
     
     await producer.send_event(
         topic="user-events",
-        key=user_in.email,
-        value={"event": "UserRegistered", "email": user_in.email, "first_name": user_in.first_name, "role": "user"}
+        key=email,
+        value={"event": "UserRegistered", "email": email, "first_name": user.get("first_name", ""), "role": user.get("role", "user")}
     )
     
-    return UserResponse(email=user_in.email, first_name=user_in.first_name, role="user")
+    access_token = create_access_token(subject=user["email"], role=user.get("role", "user"))
+    return Token(access_token=access_token, token_type="bearer")
+
+async def resend_verification_email(email: str) -> dict[str, str]:
+    user = await user_repository.get_user_by_email(email)
+    if not user:
+        raise EmailNotRegisteredException()
+        
+    if user.get("is_verified", False):
+        return {"message": "La cuenta ya se encuentra verificada."}
+        
+    verification_token = create_verification_token(email)
+    await email_service.send_verification_email(
+        to_email=email,
+        first_name=user.get("first_name", "Usuario"),
+        verification_token=verification_token
+    )
+    return {"message": "Correo de verificación reenviado con éxito."}
 
 async def authenticate_user(login_in: Login) -> Token:
     user = await user_repository.get_user_by_email(login_in.email)
@@ -40,8 +91,12 @@ async def authenticate_user(login_in: Login) -> Token:
     if not verify_password(login_in.password, user["hashed_password"]):
         raise InvalidCredentialsException()
         
+    if not user.get("is_verified", False):
+        raise UserNotVerifiedException(email=user["email"])
+        
     access_token = create_access_token(subject=user["email"], role=user.get("role", "user"))
     return Token(access_token=access_token, token_type="bearer")
+
 
 async def process_onboarding(onboarding_in: UserOnboarding):
     user = await user_repository.get_user_by_email(onboarding_in.email)

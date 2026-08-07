@@ -360,6 +360,8 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   ngOnInit() {
+    this.sessionId = crypto.randomUUID();
+    this.chatService.clearChat();
     const userId = this.authService.currentUser()?.email;
     if (userId) {
       this.chatService.loadConversations(userId);

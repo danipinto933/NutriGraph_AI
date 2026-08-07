@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, effect } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 
@@ -29,7 +29,21 @@ export class ChatService {
   public isAgentTyping = signal<boolean>(false);
   public error = signal<string | null>(null);
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) {
+    effect(() => {
+      const user = this.authService.currentUser();
+      if (!user) {
+        this.resetState();
+      }
+    });
+  }
+
+  resetState(): void {
+    this.messages.set([]);
+    this.pastConversations.set([]);
+    this.isAgentTyping.set(false);
+    this.error.set(null);
+  }
 
   async loadConversations(userId: string): Promise<void> {
     const token = this.authService.getToken();

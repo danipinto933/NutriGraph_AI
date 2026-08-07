@@ -2,7 +2,7 @@
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
-COPY requirements.txt .
+COPY services/user-auth-service/requirements.txt .
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -19,8 +19,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY app/ ./app/
+COPY services/user-auth-service/app ./app
 
 EXPOSE 8000
 
 CMD ["fastapi", "run", "app/main.py", "--port", "8000"]
+

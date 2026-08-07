@@ -23,6 +23,16 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     role: str = "user"
+    is_verified: bool = False
+
+class UserRegisterResponse(BaseModel):
+    message: str
+    email: EmailStr
+    is_verified: bool = False
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
 
 class UserOnboarding(BaseModel):
     email: EmailStr
