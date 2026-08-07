@@ -66,6 +66,16 @@ async def domain_exception_handler(request: Request, exc: DomainException):
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+@app.get("/")
+def root():
+    return {
+        "service": settings.PROJECT_NAME,
+        "status": "online",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+

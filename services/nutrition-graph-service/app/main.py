@@ -54,6 +54,16 @@ app.router.lifespan_context = lifespan
 app.include_router(recipes.router, prefix=f"{settings.API_V1_STR}/recipes", tags=["Recipes"])
 app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/admin/analytics", tags=["Analytics"])
 
+@app.get("/")
+async def root():
+    return {
+        "service": settings.PROJECT_NAME,
+        "status": "online",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
