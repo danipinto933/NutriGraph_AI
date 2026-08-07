@@ -18,13 +18,27 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up User & Auth Service")
-    await user_repository.connect()
-    await producer.start()
+    try:
+        await user_repository.connect()
+    except Exception as e:
+        logger.warning(f"Failed to connect to Neo4j on startup: {e}")
+    
+    try:
+        await producer.start()
+    except Exception as e:
+        logger.warning(f"Failed to start Kafka Producer on startup: {e}")
+        
     yield
     # Shutdown
     logger.info("Shutting down User & Auth Service")
-    await producer.stop()
-    await user_repository.close()
+    try:
+        await producer.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping Kafka Producer: {e}")
+    try:
+        await user_repository.close()
+    except Exception as e:
+        logger.warning(f"Error closing Neo4j connection: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
