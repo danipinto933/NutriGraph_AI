@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
     
     NEO4J_URI: str
-    NEO4J_AUTH: str
+    NEO4J_USER: str
+    NEO4J_PASSWORD: str
     
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_CLIENT_ID: str = "user-auth-service"

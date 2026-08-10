@@ -40,6 +40,11 @@ spec:
                 configMapKeyRef:
                   name: nutrigraph-config
                   key: KAFKA_BOOTSTRAP_SERVERS
+            - name: NEO4J_USER
+              valueFrom:
+                secretKeyRef:
+                  name: nutrigraph-secrets
+                  key: NEO4J_USER
             - name: NEO4J_PASSWORD
               valueFrom:
                 secretKeyRef:

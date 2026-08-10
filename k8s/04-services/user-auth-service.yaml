@@ -45,6 +45,11 @@ spec:
                 secretKeyRef:
                   name: nutrigraph-secrets
                   key: JWT_SECRET
+            - name: NEO4J_USER
+              valueFrom:
+                secretKeyRef:
+                  name: nutrigraph-secrets
+                  key: NEO4J_USER
             - name: NEO4J_PASSWORD
               valueFrom:
                 secretKeyRef:

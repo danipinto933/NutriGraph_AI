@@ -11,10 +11,9 @@ class UserRepository:
         self.driver: AsyncDriver | None = None
 
     async def connect(self):
-        auth = settings.NEO4J_AUTH.split('/')
         self.driver = AsyncGraphDatabase.driver(
             settings.NEO4J_URI,
-            auth=(auth[0], auth[1]) if len(auth) == 2 else None
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
         )
         logger.info(f"Connected to Neo4j at {settings.NEO4J_URI}")
 
