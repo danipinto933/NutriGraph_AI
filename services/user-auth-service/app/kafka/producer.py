@@ -26,8 +26,8 @@ class KafkaEventProducer:
 
     async def send_event(self, topic: str, value: dict, key: str | None = None):
         if not self.producer:
-            logger.error("Kafka producer is not initialized")
-            raise RuntimeError("Kafka producer is not initialized")
+            logger.warning(f"Kafka producer is not initialized. Skipping event emission to topic '{topic}'.")
+            return
         key_bytes = key.encode('utf-8') if key else None
         await self.producer.send_and_wait(topic, value=value, key=key_bytes)
         logger.info(f"Event sent to topic {topic} with key {key}")

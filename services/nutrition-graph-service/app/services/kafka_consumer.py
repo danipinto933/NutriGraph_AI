@@ -17,21 +17,26 @@ class KafkaConsumerService:
         self.task = None
 
     async def start(self):
-        self.consumer = AIOKafkaConsumer(
-            settings.KAFKA_USER_EVENTS_TOPIC,
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-            group_id=settings.KAFKA_CONSUMER_GROUP,
-            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-            auto_offset_reset="earliest",
-        )
-        self.producer = AIOKafkaProducer(
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-            value_serializer=lambda m: json.dumps(m).encode("utf-8")
-        )
-        await self.consumer.start()
-        await self.producer.start()
-        logger.info("Kafka consumer and producer (for DLQ) started.")
-        self.task = asyncio.create_task(self._consume())
+        try:
+            self.consumer = AIOKafkaConsumer(
+                settings.KAFKA_USER_EVENTS_TOPIC,
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+                group_id=settings.KAFKA_CONSUMER_GROUP,
+                value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+                auto_offset_reset="earliest",
+            )
+            self.producer = AIOKafkaProducer(
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+                value_serializer=lambda m: json.dumps(m).encode("utf-8")
+            )
+            await self.consumer.start()
+            await self.producer.start()
+            logger.info("Kafka consumer and producer (for DLQ) started.")
+            self.task = asyncio.create_task(self._consume())
+        except Exception as e:
+            logger.warning(f"Failed to start Kafka consumer/producer: {e}. Running in HTTP-only mode.")
+            self.consumer = None
+            self.producer = None
 
     async def stop(self):
         if self.task:
@@ -74,6 +79,9 @@ class KafkaConsumerService:
             await self._send_to_dlq(payload, str(e))
 
     async def _send_to_dlq(self, payload: dict, error: str):
+        if not self.producer:
+            logger.warning("DLQ producer not available. Skipping DLQ message.")
+            return
         try:
             dlq_message = {
                 "original_payload": payload,
