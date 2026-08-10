@@ -39,6 +39,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}/user-auth-service:latest
             ghcr.io/${{ env.REPO_LOWER }}/user-auth-service:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -51,6 +53,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}/nutrition-graph-service:latest
             ghcr.io/${{ env.REPO_LOWER }}/nutrition-graph-service:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -63,6 +67,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}/ai-agent-service:latest
             ghcr.io/${{ env.REPO_LOWER }}/ai-agent-service:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -75,5 +81,7 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}/frontend:latest
             ghcr.io/${{ env.REPO_LOWER }}/frontend:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
