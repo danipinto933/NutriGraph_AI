@@ -60,13 +60,20 @@ export class AuthService {
     
     return this.http.post<TokenResponse>(`${this.apiUrl}/login`, payload).pipe(
       tap(response => {
-        this.setToken(response.access_token);
-        this.fetchCurrentUser().subscribe();
+        if (response && response.access_token) {
+          this.setToken(response.access_token);
+          this.fetchCurrentUser().subscribe({
+            error: err => console.error('[AuthService] Error al obtener usuario tras login:', err)
+          });
+        } else {
+          console.warn('[AuthService] Respuesta de login sin access_token válido:', response);
+        }
         this.isLoading.set(false);
       }),
       catchError(err => {
         this.isLoading.set(false);
-        this.error.set(err.error?.error || err.error?.detail || err.error?.message || 'Login failed');
+        const errorMsg = err?.error?.error || err?.error?.detail || err?.error?.message || err?.message || 'Error al iniciar sesión';
+        this.error.set(errorMsg);
         return throwError(() => err);
       })
     );
@@ -79,7 +86,8 @@ export class AuthService {
       tap(() => this.isLoading.set(false)),
       catchError(err => {
         this.isLoading.set(false);
-        this.error.set(err.error?.error || err.error?.detail || 'Error en el registro');
+        const errorMsg = err?.error?.error || err?.error?.detail || err?.error?.message || err?.message || 'Error en el registro';
+        this.error.set(errorMsg);
         return throwError(() => err);
       })
     );
@@ -91,13 +99,20 @@ export class AuthService {
     this.error.set(null);
     return this.http.get<TokenResponse>(`${this.apiUrl}/verify-email?token=${token}`).pipe(
       tap(response => {
-        this.setToken(response.access_token);
-        this.fetchCurrentUser().subscribe();
+        if (response && response.access_token) {
+          this.setToken(response.access_token);
+          this.fetchCurrentUser().subscribe({
+            error: err => console.error('[AuthService] Error al obtener usuario tras verificación:', err)
+          });
+        } else {
+          console.warn('[AuthService] Respuesta de verificación sin access_token válido:', response);
+        }
         this.isLoading.set(false);
       }),
       catchError(err => {
         this.isLoading.set(false);
-        this.error.set(err.error?.detail || 'Error al verificar el correo electrónico');
+        const errorMsg = err?.error?.detail || err?.error?.message || err?.message || 'Error al verificar el correo electrónico';
+        this.error.set(errorMsg);
         return throwError(() => err);
       })
     );
@@ -111,7 +126,8 @@ export class AuthService {
       tap(() => this.isLoading.set(false)),
       catchError(err => {
         this.isLoading.set(false);
-        this.error.set(err.error?.detail || 'Error al reenviar el correo de verificación');
+        const errorMsg = err?.error?.detail || err?.error?.message || err?.message || 'Error al reenviar el correo de verificación';
+        this.error.set(errorMsg);
         return throwError(() => err);
       })
     );

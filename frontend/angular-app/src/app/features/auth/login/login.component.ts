@@ -146,7 +146,10 @@ export class LoginComponent {
     if (email) {
       this.authService.resendVerification(email).subscribe({
         next: (res: any) => {
-          this.resendMessage.set(res.message || 'Correo enviado');
+          this.resendMessage.set(res?.message || 'Correo enviado');
+        },
+        error: (err) => {
+          console.error('[LoginComponent] Error al reenviar correo:', err);
         }
       });
     }
@@ -156,7 +159,14 @@ export class LoginComponent {
     if (this.loginForm.valid) {
       this.resendMessage.set(null);
       this.authService.login(this.loginForm.value).subscribe({
-        next: () => this.router.navigate(['/chat'])
+        next: (res) => {
+          if (res && res.access_token) {
+            this.router.navigate(['/chat']);
+          }
+        },
+        error: (err) => {
+          console.error('[LoginComponent] Error en el intento de inicio de sesión:', err);
+        }
       });
     }
   }
