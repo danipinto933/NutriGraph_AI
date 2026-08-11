@@ -13,8 +13,6 @@ class Neo4jClient:
         self._driver: AsyncDriver | None = None
 
     async def connect(self):
-        logger.info(f"[NEO4J AUTH DEBUG] nutrition-graph-service usando NEO4J_USER='{self._user}', NEO4J_PASSWORD='{self._password}', NEO4J_URI='{self._uri}'")
-        print(f"[NEO4J AUTH DEBUG] nutrition-graph-service usando NEO4J_USER='{self._user}', NEO4J_PASSWORD='{self._password}', NEO4J_URI='{self._uri}'", flush=True)
         try:
             self._driver = AsyncGraphDatabase.driver(
                 self._uri, auth=(self._user, self._password)

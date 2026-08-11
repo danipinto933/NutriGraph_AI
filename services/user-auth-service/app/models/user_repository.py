@@ -11,8 +11,6 @@ class UserRepository:
         self.driver: AsyncDriver | None = None
 
     async def connect(self):
-        logger.info(f"[NEO4J AUTH DEBUG] user-auth-service usando NEO4J_USER='{settings.NEO4J_USER}', NEO4J_PASSWORD='{settings.NEO4J_PASSWORD}', NEO4J_URI='{settings.NEO4J_URI}'")
-        print(f"[NEO4J AUTH DEBUG] user-auth-service usando NEO4J_USER='{settings.NEO4J_USER}', NEO4J_PASSWORD='{settings.NEO4J_PASSWORD}', NEO4J_URI='{settings.NEO4J_URI}'", flush=True)
         self.driver = AsyncGraphDatabase.driver(
             settings.NEO4J_URI,
             auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)

@@ -13,13 +13,40 @@ logger = logging.getLogger(__name__)
 
 from app.core.client import http_client
 from app.models.chat_repository import chat_repository
+from app.services.kafka_service import kafka_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await chat_repository.connect()
+    # Startup
+    logger.info("Starting up AI Agent Service")
+    try:
+        await chat_repository.connect()
+    except Exception as e:
+        logger.warning(f"Failed to connect to Neo4j on startup: {e}")
+
+    try:
+        await kafka_service.start()
+    except Exception as e:
+        logger.warning(f"Failed to start Kafka consumer on startup: {e}")
+
     yield
-    await chat_repository.close()
-    await http_client.aclose()
+
+    # Shutdown
+    logger.info("Shutting down AI Agent Service")
+    try:
+        await kafka_service.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping Kafka consumer: {e}")
+
+    try:
+        await chat_repository.close()
+    except Exception as e:
+        logger.warning(f"Error closing Neo4j connection: {e}")
+
+    try:
+        await http_client.aclose()
+    except Exception as e:
+        logger.warning(f"Error closing HTTP client: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
