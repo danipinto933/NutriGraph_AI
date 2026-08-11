@@ -136,6 +136,12 @@ services:
     container_name: frontend
     ports:
       - "4200:80"
+    environment:
+      - API_URL=${API_URL:-http://localhost:8000/api/v1}
+      - GRAPH_API_URL=${GRAPH_API_URL:-http://localhost:8001/api/v1}
+      - CHAT_API_URL=${CHAT_API_URL:-http://localhost:8002/api/v1}
+    env_file:
+      - .env
     networks:
       - nutrigraph_network
     depends_on:
