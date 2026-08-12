@@ -42,14 +42,22 @@ async def _fetch(url: str, params: dict = None) -> Any:
                 ) from exc
 
 
-async def _buscar_receta_por_macros(user_id: str, max_calories: float, min_protein: float) -> str:
+def _get_base_url() -> str:
+    base = settings.NUTRITION_GRAPH_SERVICE_URL.rstrip('/')
+    if not base.endswith('/api/v1'):
+        base = f"{base}/api/v1"
+    return base
+
+async def _buscar_receta_por_macros(user_id: str, max_calories: float, min_protein: float, diet_type: str = None) -> str:
     """Busca recetas recomendadas para un usuario que cumplan con requisitos de calorías máximas y proteína mínima. Devuelve las recetas y sus macros."""
-    url = f"{settings.NUTRITION_GRAPH_SERVICE_URL}/recipes/search"
+    url = f"{_get_base_url()}/recipes/search"
     params = {
         "user_id": user_id,
         "max_calories": max_calories,
         "min_protein": min_protein,
     }
+    if diet_type:
+        params["diet_type"] = diet_type
     try:
         result = await _fetch(url, params)
     except InfrastructureException as e:
@@ -72,14 +80,15 @@ async def _buscar_recetas_avanzado(
     max_calories: float = None, 
     min_protein: float = None, 
     ingrediente: str = None, 
-    nombre_receta: str = None
+    nombre_receta: str = None,
+    diet_type: str = None
 ) -> str:
     """
     Busca recetas para un usuario aplicando filtros opcionales. 
-    Puedes filtrar por máximo de calorías, mínimo de proteína, contener un ingrediente específico o por el nombre de la receta.
+    Puedes filtrar por máximo de calorías, mínimo de proteína, contener un ingrediente específico, nombre de receta o tipo de dieta (ej. 'Vegana').
     Devuelve las recetas (ID, nombre, macros, ingredientes).
     """
-    url = f"{settings.NUTRITION_GRAPH_SERVICE_URL}/recipes/search_advanced"
+    url = f"{_get_base_url()}/recipes/search_advanced"
     params = {"user_id": user_id}
     if max_calories is not None:
         params["max_calories"] = max_calories
@@ -89,6 +98,8 @@ async def _buscar_recetas_avanzado(
         params["ingredient"] = ingrediente
     if nombre_receta:
         params["name"] = nombre_receta
+    if diet_type:
+        params["diet_type"] = diet_type
         
     try:
         result = await _fetch(url, params)
@@ -108,13 +119,15 @@ async def _buscar_recetas_avanzado(
         )
     return formatted
 
-async def _verificar_compatibilidad_alimento(user_id: str, ingredient_name: str) -> str:
-    """Verifica si un ingrediente específico es compatible con el usuario (revisa alergias y tipo de dieta)."""
-    url = f"{settings.NUTRITION_GRAPH_SERVICE_URL}/recipes/verify"
+async def _verificar_compatibilidad_alimento(user_id: str, ingredient_name: str, diet_type: str = None) -> str:
+    """Verifica si un ingrediente específico es compatible con el usuario (revisa alergias y tipo de dieta como 'Vegana')."""
+    url = f"{_get_base_url()}/recipes/verify"
     params = {
         "user_id": user_id,
         "ingredient_name": ingredient_name,
     }
+    if diet_type:
+        params["diet_type"] = diet_type
     try:
         result = await _fetch(url, params)
     except InfrastructureException as e:
@@ -132,7 +145,7 @@ async def _verificar_compatibilidad_alimento(user_id: str, ingredient_name: str)
 
 async def _obtener_desglose_receta(recipe_id: str) -> str:
     """Obtiene los ingredientes y cantidades en gramos de una receta específica dada su ID."""
-    url = f"{settings.NUTRITION_GRAPH_SERVICE_URL}/recipes/{recipe_id}/breakdown"
+    url = f"{_get_base_url()}/recipes/{recipe_id}/breakdown"
     try:
         result = await _fetch(url)
     except InfrastructureException as e:
@@ -162,8 +175,9 @@ buscar_recetas_avanzado = StructuredTool.from_function(
     coroutine=_buscar_recetas_avanzado,
     name="buscar_recetas_avanzado",
     description=(
-        "Busca recetas recomendadas para un usuario. Permite filtrar opcionalmente por calorías máximas, "
-        "proteína mínima, ingredientes requeridos (ej. 'pollo') o nombre de receta."
+        "OBLIGATORIO: Busca recetas e ingredientes en la base de datos de grafos de nutrición. "
+        "SIEMPRE debes llamar a esta herramienta cuando el usuario pida sugerencias de comida, cena, recetas, "
+        "ingredientes o menús. Puedes enviar diet_type='Vegana' si el usuario es o indica ser vegano."
     ),
 )
 
@@ -172,7 +186,7 @@ verificar_compatibilidad_alimento = StructuredTool.from_function(
     name="verificar_compatibilidad_alimento",
     description=(
         "Verifica si un ingrediente específico es compatible con el usuario "
-        "(revisa alergias y tipo de dieta)."
+        "(revisa alergias y tipo de dieta como Vegana)."
     ),
 )
 

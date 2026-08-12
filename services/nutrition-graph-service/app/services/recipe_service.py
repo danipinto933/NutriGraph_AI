@@ -7,16 +7,17 @@ from app.models.schemas import RecipeMacros, RecipeRecommendation
 logger = logging.getLogger(__name__)
 
 class RecipeService:
-    async def get_recommendations(self, user_id: str) -> List[RecipeRecommendation]:
+    async def get_recommendations(self, user_id: str, diet_type: str | None = None) -> List[RecipeRecommendation]:
         driver = neo4j_client.get_driver()
         
         # Consulta Cypher para obtener recetas recomendadas
         # 1. Filtra recetas que no contengan ingredientes con alérgenos del usuario.
-        # 2. Excluye ingredientes excluidos por la dieta (insensible a mayúsculas).
+        # 2. Excluye ingredientes excluidos por la dieta (insensible a mayúsculas, usando COALESCE entre parámetro e u.diet_type).
         # 3. Calcula dinámicamente los macronutrientes.
         query = """
         OPTIONAL MATCH (u:User) WHERE toLower(u.email) = toLower($user_id)
-        OPTIONAL MATCH (d:DietType) WHERE u.diet_type IS NOT NULL AND toLower(d.name) = toLower(u.diet_type)
+        WITH u, COALESCE($diet_type, u.diet_type) AS active_diet
+        OPTIONAL MATCH (d:DietType) WHERE active_diet IS NOT NULL AND toLower(d.name) = toLower(active_diet)
         
         // Obtener recetas que no violen las intolerancias del usuario
         MATCH (r:Recipe)
@@ -57,7 +58,7 @@ class RecipeService:
         recommendations = []
         try:
             async with driver.session() as session:
-                result = await session.run(query, user_id=user_id)
+                result = await session.run(query, user_id=user_id, diet_type=diet_type)
                 async for record in result:
                     macros = RecipeMacros(
                         calories=round(record["total_calories"], 2),
@@ -79,18 +80,24 @@ class RecipeService:
             
         return recommendations
 
-    async def search_by_macros(self, user_id: str, max_calories: float, min_protein: float) -> List[RecipeRecommendation]:
-        # Reuse get_recommendations but filter in Python for simplicity, 
-        # or we could do it in Cypher. Python filtering is okay for this prototype.
-        recommendations = await self.get_recommendations(user_id)
+    async def search_by_macros(self, user_id: str, max_calories: float, min_protein: float, diet_type: str | None = None) -> List[RecipeRecommendation]:
+        recommendations = await self.get_recommendations(user_id, diet_type=diet_type)
         filtered = [
             r for r in recommendations 
             if r.macros.calories <= max_calories and r.macros.protein_g >= min_protein
         ]
         return filtered
 
-    async def search_advanced(self, user_id: str, max_calories: float | None = None, min_protein: float | None = None, ingredient: str | None = None, name: str | None = None) -> List[RecipeRecommendation]:
-        recommendations = await self.get_recommendations(user_id)
+    async def search_advanced(
+        self, 
+        user_id: str, 
+        max_calories: float | None = None, 
+        min_protein: float | None = None, 
+        ingredient: str | None = None, 
+        name: str | None = None,
+        diet_type: str | None = None
+    ) -> List[RecipeRecommendation]:
+        recommendations = await self.get_recommendations(user_id, diet_type=diet_type)
         filtered = recommendations
         if max_calories is not None:
             filtered = [r for r in filtered if r.macros.calories <= max_calories]
@@ -102,11 +109,12 @@ class RecipeService:
             filtered = [r for r in filtered if name.lower() in r.name.lower()]
         return filtered
 
-    async def verify_compatibility(self, user_id: str, ingredient_name: str) -> bool:
+    async def verify_compatibility(self, user_id: str, ingredient_name: str, diet_type: str | None = None) -> bool:
         driver = neo4j_client.get_driver()
         query = """
         OPTIONAL MATCH (u:User) WHERE toLower(u.email) = toLower($user_id)
-        OPTIONAL MATCH (d:DietType) WHERE u.diet_type IS NOT NULL AND toLower(d.name) = toLower(u.diet_type)
+        WITH u, COALESCE($diet_type, u.diet_type) AS active_diet
+        OPTIONAL MATCH (d:DietType) WHERE active_diet IS NOT NULL AND toLower(d.name) = toLower(active_diet)
         OPTIONAL MATCH (i:Ingredient) WHERE toLower(i.name) CONTAINS toLower($ingredient_name) OR toLower($ingredient_name) CONTAINS toLower(i.name)
         
         WITH u, d, collect(i) AS matched_ingredients
@@ -124,10 +132,9 @@ class RecipeService:
                sum(CASE WHEN a IS NOT NULL OR ex1 IS NOT NULL OR ex2 IS NOT NULL THEN 1 ELSE 0 END) AS incompatible_count
         """
         async with driver.session() as session:
-            result = await session.run(query, user_id=user_id, ingredient_name=ingredient_name)
+            result = await session.run(query, user_id=user_id, ingredient_name=ingredient_name, diet_type=diet_type)
             record = await result.single()
             if not record or record["checked_count"] == 0:
-                # Si no hay ingrediente en la BD pero conocemos la dieta del usuario, hacer una validación heurística adicional
                 return True
             return record["incompatible_count"] == 0
 
