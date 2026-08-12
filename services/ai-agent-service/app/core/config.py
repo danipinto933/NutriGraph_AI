@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str
 
     # Kafka Settings (opcional / resiliencia)
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
-    KAFKA_RECIPE_EVENTS_TOPIC: str = "nutrition-recipe-events"
-    KAFKA_CONSUMER_GROUP: str = "ai-agent-service-group"
+    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_RECIPE_EVENTS_TOPIC: str
+    KAFKA_CONSUMER_GROUP: str
 
     model_config = SettingsConfigDict(env_file=[".env", "../../.env"], env_file_encoding="utf-8", extra="ignore")
 
