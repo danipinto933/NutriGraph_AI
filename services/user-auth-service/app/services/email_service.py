@@ -4,6 +4,7 @@ import smtplib
 import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,10 @@ class IPv4SMTP_SSL(smtplib.SMTP_SSL):
 
 class EmailService:
     @property
+    def brevo_api_key(self) -> str:
+        return (getattr(settings, "BREVO_API_KEY", "") or "").strip()
+
+    @property
     def smtp_host(self) -> str:
         return settings.SMTP_HOST
 
@@ -87,6 +92,42 @@ class EmailService:
     @property
     def frontend_url(self) -> str:
         return settings.FRONTEND_URL.rstrip('/')
+
+    async def _send_email_brevo_api_async(self, to_email: str, subject: str, html_content: str) -> bool:
+        """
+        Sends an email using Brevo's REST API over HTTPS (Port 443).
+        Bypasses any cloud platform SMTP port blocks completely.
+        """
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": self.brevo_api_key,
+            "content-type": "application/json"
+        }
+        payload = {
+            "sender": {
+                "name": "NutriGraph AI",
+                "email": self.from_email
+            },
+            "to": [
+                {"email": to_email}
+            ],
+            "subject": subject,
+            "htmlContent": html_content
+        }
+        try:
+            logger.info(f"Attempting Brevo HTTP API email delivery (HTTPS port 443) to '{to_email}' from '{self.from_email}'...")
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code in (200, 201, 202):
+                    logger.info(f"Email sent successfully via Brevo HTTP API (Port 443) to recipient '{to_email}'")
+                    return True
+                else:
+                    logger.error(f"Brevo HTTP API delivery failed [{response.status_code}]: {response.text}")
+                    return False
+        except Exception as e:
+            logger.error(f"Error sending email via Brevo HTTP API: {e}", exc_info=True)
+            return False
 
     def _send_email_smtp_sync(self, to_email: str, subject: str, html_content: str) -> bool:
         to_email_clean = to_email.strip().lower()
@@ -132,9 +173,20 @@ class EmailService:
         logger.error(f"All SMTP connection attempts failed for recipient '{to_email_clean}'. Last error: {last_err}", exc_info=True)
         return False
 
+    async def _send_email(self, to_email: str, subject: str, html_content: str) -> bool:
+        to_email_clean = to_email.strip().lower()
+        if self.brevo_api_key:
+            return await self._send_email_brevo_api_async(to_email_clean, subject, html_content)
+        
+        if self.smtp_user and self.smtp_password:
+            return await asyncio.to_thread(self._send_email_smtp_sync, to_email_clean, subject, html_content)
+
+        logger.warning("Neither BREVO_API_KEY nor SMTP credentials configured. Skipping email sending.")
+        return False
+
     async def send_verification_email(self, to_email: str, first_name: str, verification_token: str) -> bool:
         """
-        Sends a magic link email verification using Gmail SMTP.
+        Sends a magic link email verification using Brevo HTTP API or fallback SMTP.
         """
         to_email_clean = to_email.strip().lower()
         verification_url = f"{self.frontend_url}/verify-email?token={verification_token}"
@@ -234,12 +286,8 @@ class EmailService:
         </html>
         """
 
-        if not self.smtp_user or not self.smtp_password:
-            logger.warning("SMTP credentials are not configured. Skipping email sending.")
-            return False
-
         subject = "Verifica tu cuenta en NutriGraph AI - Magic Link"
-        return await asyncio.to_thread(self._send_email_smtp_sync, to_email_clean, subject, html_content)
+        return await self._send_email(to_email_clean, subject, html_content)
 
     async def send_admin_notification(self, registered_user_email: str, first_name: str) -> bool:
         """
@@ -248,10 +296,6 @@ class EmailService:
         admin_email = getattr(settings, "ADMIN_EMAIL", "danipinto933@gmail.com")
         if not admin_email:
             logger.warning("No ADMIN_EMAIL specified. Skipping admin notification.")
-            return False
-
-        if not self.smtp_user or not self.smtp_password:
-            logger.warning("SMTP credentials not configured. Skipping admin notification email.")
             return False
 
         subject = f"🔔 Nuevo usuario registrado en NutriGraph AI: {registered_user_email}"
@@ -281,6 +325,7 @@ class EmailService:
         </body>
         </html>
         """
-        return await asyncio.to_thread(self._send_email_smtp_sync, admin_email.strip().lower(), subject, html_content)
+        return await self._send_email(admin_email.strip().lower(), subject, html_content)
+
 
 email_service = EmailService()

@@ -18,11 +18,13 @@ class Settings(BaseSettings):
     FRONTEND_URL: str
     EMAIL_FROM: str 
     ADMIN_EMAIL: str 
+
+    BREVO_API_KEY: str = ""
     
-    SMTP_HOST: str
-    SMTP_PORT: int 
-    SMTP_USER: str
-    SMTP_PASSWORD: str 
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = "" 
     
     model_config = SettingsConfigDict(env_file=[".env", "../../.env"], env_file_encoding="utf-8", extra="ignore")
 
