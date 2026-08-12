@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     
     FRONTEND_URL: str
     EMAIL_FROM: str 
+    ADMIN_EMAIL: str 
     
     SMTP_HOST: str
     SMTP_PORT: int 

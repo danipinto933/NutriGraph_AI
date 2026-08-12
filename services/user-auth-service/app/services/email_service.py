@@ -44,15 +44,23 @@ class EmailService:
             part = MIMEText(html_content, "html")
             msg.attach(part)
 
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.sendmail(self.from_email, [to_email_clean], msg.as_string())
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=12) as server:
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.sendmail(self.from_email, [to_email_clean], msg.as_string())
+            else:
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=12) as server:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.sendmail(self.from_email, [to_email_clean], msg.as_string())
 
-            logger.info(f"Verification email sent successfully via SMTP to recipient '{to_email_clean}' from '{self.from_email}'")
+            logger.info(f"Email sent successfully via SMTP (port {self.smtp_port}) to recipient '{to_email_clean}' from '{self.from_email}'")
             return True
+        except smtplib.SMTPAuthenticationError as auth_err:
+            logger.error(f"SMTP Auth Failure (Check App Password / SMTP_USER / SMTP_PASSWORD) for recipient '{to_email}': {auth_err}")
+            return False
         except Exception as e:
-            logger.error(f"Error sending email via SMTP to recipient '{to_email}': {e}")
+            logger.error(f"Error sending email via SMTP (host: {self.smtp_host}, port: {self.smtp_port}) to recipient '{to_email}': {e}", exc_info=True)
             return False
 
     async def send_verification_email(self, to_email: str, first_name: str, verification_token: str) -> bool:
@@ -163,5 +171,47 @@ class EmailService:
 
         subject = "Verifica tu cuenta en NutriGraph AI - Magic Link"
         return await asyncio.to_thread(self._send_email_smtp_sync, to_email_clean, subject, html_content)
+
+    async def send_admin_notification(self, registered_user_email: str, first_name: str) -> bool:
+        """
+        Sends an alert email to the admin when a new user registers or requests access.
+        """
+        admin_email = getattr(settings, "ADMIN_EMAIL", "danipinto933@gmail.com")
+        if not admin_email:
+            logger.warning("No ADMIN_EMAIL specified. Skipping admin notification.")
+            return False
+
+        if not self.smtp_user or not self.smtp_password:
+            logger.warning("SMTP credentials not configured. Skipping admin notification email.")
+            return False
+
+        subject = f"🔔 Nuevo usuario registrado en NutriGraph AI: {registered_user_email}"
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: 'Segoe UI', sans-serif; background-color: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }}
+                .container {{ max-width: 550px; margin: 0 auto; background: #1e293b; border-radius: 16px; padding: 32px; border: 1px solid #334155; }}
+                .title {{ font-size: 22px; font-weight: 700; color: #10b981; margin-top: 0; }}
+                .info-box {{ background: #0f172a; border-radius: 8px; padding: 16px; margin: 20px 0; border-left: 4px solid #00d2ff; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2 class="title">🔔 Nueva Solicitud de Registro</h2>
+                <p>Se ha registrado un nuevo usuario en la plataforma NutriGraph AI:</p>
+                <div class="info-box">
+                    <p><strong>Nombre:</strong> {first_name}</p>
+                    <p><strong>Correo electrónico:</strong> {registered_user_email}</p>
+                    <p><strong>Estado:</strong> Pendiente de verificación por correo electrónico</p>
+                </div>
+                <p style="font-size: 13px; color: #94a3b8;">Notificación automática del sistema NutriGraph AI.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return await asyncio.to_thread(self._send_email_smtp_sync, admin_email.strip().lower(), subject, html_content)
 
 email_service = EmailService()

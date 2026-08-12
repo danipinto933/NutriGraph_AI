@@ -54,3 +54,18 @@ async def test_resend_verification(mock_resend):
     assert response.status_code == 200
     assert response.json()["message"] == "Correo de verificación reenviado con éxito."
 
+@pytest.mark.asyncio
+@patch("app.services.email_service.email_service._send_email_smtp_sync")
+async def test_email_service_notifications(mock_send):
+    mock_send.return_value = True
+    from app.services.email_service import email_service
+    
+    # Test user verification email
+    res1 = await email_service.send_verification_email("newuser@test.com", "TestUser", "dummy_token")
+    assert res1 is True
+    
+    # Test admin notification email
+    res2 = await email_service.send_admin_notification("newuser@test.com", "TestUser")
+    assert res2 is True
+
+

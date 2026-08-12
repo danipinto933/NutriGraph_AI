@@ -1,3 +1,4 @@
+import logging
 from app.core.exceptions import (
     InvalidCredentialsException,
     UserAlreadyExistsException,
@@ -20,6 +21,8 @@ from app.schemas.user import UserCreate, UserOnboarding, UserRegisterResponse, U
 from app.services.biometrics import get_biometric_profile
 from app.services.email_service import email_service
 
+logger = logging.getLogger(__name__)
+
 
 async def register_user(user_in: UserCreate) -> UserRegisterResponse:
     clean_email = user_in.email.strip().lower()
@@ -36,11 +39,23 @@ async def register_user(user_in: UserCreate) -> UserRegisterResponse:
     )
     
     verification_token = create_verification_token(clean_email)
-    await email_service.send_verification_email(
+    
+    # Send verification email to user
+    email_sent = await email_service.send_verification_email(
         to_email=clean_email,
         first_name=user_in.first_name.strip(),
         verification_token=verification_token
     )
+    if not email_sent:
+        logger.warning(f"Verification email failed to send to user '{clean_email}'. Check SMTP settings on Render.")
+        
+    # Send notification email to admin
+    admin_notified = await email_service.send_admin_notification(
+        registered_user_email=clean_email,
+        first_name=user_in.first_name.strip()
+    )
+    if not admin_notified:
+        logger.warning(f"Admin notification email failed to send for registered user '{clean_email}'.")
     
     return UserRegisterResponse(
         message="Usuario registrado correctamente. Por favor revisa tu correo electrónico para activar tu cuenta.",
