@@ -1,11 +1,66 @@
 import asyncio
 import logging
 import smtplib
+import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class IPv4SMTP(smtplib.SMTP):
+    """
+    Forces IPv4 (socket.AF_INET) connection to prevent '[Errno 101] Network is unreachable'
+    errors on containerized hosting platforms (e.g. Render) where IPv6 DNS entries
+    are returned first by getaddrinfo but IPv6 routing is unavailable.
+    """
+    def _get_socket(self, host, port, timeout):
+        res_list = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        err = None
+        for res in res_list:
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket.socket(af, socktype, proto)
+                if timeout is not None:
+                    sock.settimeout(timeout)
+                sock.connect(sa)
+                return sock
+            except Exception as e:
+                err = e
+                if sock is not None:
+                    sock.close()
+        if err:
+            raise err
+        raise OSError(f"Could not connect to {host}:{port} via IPv4")
+
+
+class IPv4SMTP_SSL(smtplib.SMTP_SSL):
+    """
+    Forces IPv4 (socket.AF_INET) SSL connection to prevent '[Errno 101] Network is unreachable'
+    errors on containerized hosting platforms (e.g. Render).
+    """
+    def _get_socket(self, host, port, timeout):
+        res_list = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        err = None
+        for res in res_list:
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket.socket(af, socktype, proto)
+                if timeout is not None:
+                    sock.settimeout(timeout)
+                sock.connect(sa)
+                return self.context.wrap_socket(sock, server_hostname=self._host)
+            except Exception as e:
+                err = e
+                if sock is not None:
+                    sock.close()
+        if err:
+            raise err
+        raise OSError(f"Could not connect to {host}:{port} via IPv4")
+
 
 class EmailService:
     @property
@@ -22,7 +77,8 @@ class EmailService:
 
     @property
     def smtp_password(self) -> str:
-        return settings.SMTP_PASSWORD
+        raw_pwd = settings.SMTP_PASSWORD or ""
+        return raw_pwd.replace(" ", "").strip()
 
     @property
     def from_email(self) -> str:
@@ -33,35 +89,48 @@ class EmailService:
         return settings.FRONTEND_URL.rstrip('/')
 
     def _send_email_smtp_sync(self, to_email: str, subject: str, html_content: str) -> bool:
-        try:
-            to_email_clean = to_email.strip().lower()
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"NutriGraph AI <{self.from_email}>"
-            msg["To"] = to_email_clean
-            msg["Reply-To"] = self.from_email
+        to_email_clean = to_email.strip().lower()
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"NutriGraph AI <{self.from_email}>"
+        msg["To"] = to_email_clean
+        msg["Reply-To"] = self.from_email
 
-            part = MIMEText(html_content, "html")
-            msg.attach(part)
+        part = MIMEText(html_content, "html")
+        msg.attach(part)
 
-            if self.smtp_port == 465:
-                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=12) as server:
-                    server.login(self.smtp_user, self.smtp_password)
-                    server.sendmail(self.from_email, [to_email_clean], msg.as_string())
-            else:
-                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=12) as server:
-                    server.starttls()
-                    server.login(self.smtp_user, self.smtp_password)
-                    server.sendmail(self.from_email, [to_email_clean], msg.as_string())
+        primary_port = self.smtp_port
+        fallback_port = 587 if primary_port == 465 else 465
+        ports_to_try = [primary_port]
+        if fallback_port not in ports_to_try:
+            ports_to_try.append(fallback_port)
 
-            logger.info(f"Email sent successfully via SMTP (port {self.smtp_port}) to recipient '{to_email_clean}' from '{self.from_email}'")
-            return True
-        except smtplib.SMTPAuthenticationError as auth_err:
-            logger.error(f"SMTP Auth Failure (Check App Password / SMTP_USER / SMTP_PASSWORD) for recipient '{to_email}': {auth_err}")
-            return False
-        except Exception as e:
-            logger.error(f"Error sending email via SMTP (host: {self.smtp_host}, port: {self.smtp_port}) to recipient '{to_email}': {e}", exc_info=True)
-            return False
+        last_err = None
+
+        for port in ports_to_try:
+            try:
+                logger.info(f"Attempting SMTP email delivery (host: {self.smtp_host}, port: {port}, family: IPv4) to '{to_email_clean}'...")
+                if port == 465:
+                    with IPv4SMTP_SSL(self.smtp_host, port, timeout=12) as server:
+                        server.login(self.smtp_user, self.smtp_password)
+                        server.sendmail(self.from_email, [to_email_clean], msg.as_string())
+                else:
+                    with IPv4SMTP(self.smtp_host, port, timeout=12) as server:
+                        server.starttls()
+                        server.login(self.smtp_user, self.smtp_password)
+                        server.sendmail(self.from_email, [to_email_clean], msg.as_string())
+
+                logger.info(f"Email sent successfully via SMTP (port {port}, IPv4) to recipient '{to_email_clean}' from '{self.from_email}'")
+                return True
+            except smtplib.SMTPAuthenticationError as auth_err:
+                logger.error(f"SMTP Auth Failure (Check App Password / SMTP_USER / SMTP_PASSWORD) for recipient '{to_email_clean}': {auth_err}")
+                return False
+            except Exception as e:
+                logger.warning(f"Failed SMTP delivery attempt on port {port} for recipient '{to_email_clean}': {e}")
+                last_err = e
+
+        logger.error(f"All SMTP connection attempts failed for recipient '{to_email_clean}'. Last error: {last_err}", exc_info=True)
+        return False
 
     async def send_verification_email(self, to_email: str, first_name: str, verification_token: str) -> bool:
         """
