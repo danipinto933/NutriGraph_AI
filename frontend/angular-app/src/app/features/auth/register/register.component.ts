@@ -93,7 +93,7 @@ import { AuthService } from '../../../core/services/auth.service';
           </p>
           
           <p class="info-text">
-            Por favor, revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta y acceder a NutriGraph AI.
+            Por favor, revisa tu bandeja de entrada (incluido la carpeta de spam) y haz clic en el enlace para activar tu cuenta y acceder a NutriGraph AI.
           </p>
 
           <div *ngIf="resendSuccess()" class="success-alert">
