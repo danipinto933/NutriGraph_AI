@@ -1,23 +1,46 @@
+import asyncio
 import logging
-import httpx
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class EmailService:
     def __init__(self):
-        self.api_key = settings.RESEND_API_KEY
-        self.from_email = settings.EMAIL_FROM
+        self.smtp_host = settings.SMTP_HOST
+        self.smtp_port = settings.SMTP_PORT
+        self.smtp_user = settings.SMTP_USER
+        self.smtp_password = settings.SMTP_PASSWORD
+        self.from_email = settings.EMAIL_FROM or settings.SMTP_USER
         self.frontend_url = settings.FRONTEND_URL
+
+    def _send_email_smtp_sync(self, to_email: str, subject: str, html_content: str) -> bool:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"NutriGraph AI <{self.from_email}>"
+            msg["To"] = to_email
+
+            part = MIMEText(html_content, "html")
+            msg.attach(part)
+
+            with smtplib.SMTP(self.smtp_host, int(self.smtp_port), timeout=10) as server:
+                server.starttls()
+                server.login(self.smtp_user, self.smtp_password)
+                server.sendmail(self.from_email, [to_email], msg.as_string())
+
+            logger.info(f"Verification email sent successfully via SMTP to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Error sending email via SMTP: {e}")
+            return False
 
     async def send_verification_email(self, to_email: str, first_name: str, verification_token: str) -> bool:
         """
-        Sends a magic link email verification using Resend API.
+        Sends a magic link email verification using Gmail SMTP.
         """
-        if not self.api_key:
-            logger.warning("RESEND_API_KEY is not configured. Skipping email sending.")
-            return False
-
         verification_url = f"{self.frontend_url}/verify-email?token={verification_token}"
 
         html_content = f"""
@@ -115,29 +138,11 @@ class EmailService:
         </html>
         """
 
-        payload = {
-            "from": self.from_email,
-            "to": [to_email],
-            "subject": "Verifica tu cuenta en NutriGraph AI - Magic Link",
-            "html": html_content
-        }
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post("https://api.resend.com/emails", json=payload, headers=headers)
-                if response.status_code in [200, 201]:
-                    logger.info(f"Verification email sent successfully via Resend to {to_email}")
-                    return True
-                else:
-                    logger.error(f"Failed to send email via Resend: {response.status_code} - {response.text}")
-                    return False
-        except Exception as e:
-            logger.error(f"Error sending email via Resend API: {e}")
+        if not self.smtp_user or not self.smtp_password:
+            logger.warning("SMTP credentials are not configured. Skipping email sending.")
             return False
+
+        subject = "Verifica tu cuenta en NutriGraph AI - Magic Link"
+        return await asyncio.to_thread(self._send_email_smtp_sync, to_email, subject, html_content)
 
 email_service = EmailService()

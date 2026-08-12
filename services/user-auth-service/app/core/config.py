@@ -15,9 +15,13 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_CLIENT_ID: str = "user-auth-service"
     
-    RESEND_API_KEY: str
     FRONTEND_URL: str
-    EMAIL_FROM: str
+    EMAIL_FROM: str 
+    
+    SMTP_HOST: str
+    SMTP_PORT: int 
+    SMTP_USER: str
+    SMTP_PASSWORD: str 
     
     model_config = SettingsConfigDict(env_file="../../.env", env_file_encoding="utf-8", extra="ignore")
 
