@@ -2,7 +2,7 @@ from typing import List
 
 from app.models.schemas import RecipeRecommendation
 from app.services.recipe_service import recipe_service
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Header, Query
 from nutrigraph_common.exceptions.base import (
     InfrastructureException,
     ResourceNotFoundException,
@@ -10,51 +10,61 @@ from nutrigraph_common.exceptions.base import (
 
 router = APIRouter()
 
+def _resolve_user_id(x_user_email: str | None, user_id_query: str | None) -> str:
+    user_id = x_user_email or user_id_query
+    if not user_id:
+        raise InfrastructureException(message="Identificador de usuario (X-User-Email) requerido", details={})
+    return user_id
+
 @router.get("/recommendations", response_model=List[RecipeRecommendation])
 async def get_recipe_recommendations(
-    user_id: str = Query(..., description="ID of the user to get recommendations for"),
-    diet_type: str | None = Query(None, description="Optional diet type filter (e.g. Vegana)")
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    user_id: str | None = Query(None)
 ):
+    target_user_id = _resolve_user_id(x_user_email, user_id)
     try:
-        recommendations = await recipe_service.get_recommendations(user_id, diet_type=diet_type)
+        recommendations = await recipe_service.get_recommendations(target_user_id)
         return recommendations
     except Exception as e:
         raise InfrastructureException(message="Error fetching recommendations", details={"cause": str(e)}) from e
 
 @router.get("/search", response_model=List[RecipeRecommendation])
 async def search_by_macros(
-    user_id: str = Query(...), 
     max_calories: float = Query(...), 
     min_protein: float = Query(...),
-    diet_type: str | None = Query(None)
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    user_id: str | None = Query(None)
 ):
+    target_user_id = _resolve_user_id(x_user_email, user_id)
     try:
-        return await recipe_service.search_by_macros(user_id, max_calories, min_protein, diet_type=diet_type)
+        return await recipe_service.search_by_macros(target_user_id, max_calories, min_protein)
     except Exception as e:
         raise InfrastructureException(message="Error searching recipes", details={"cause": str(e)}) from e
 
 @router.get("/search_advanced", response_model=List[RecipeRecommendation])
 async def search_advanced(
-    user_id: str = Query(...),
     max_calories: float | None = Query(None),
     min_protein: float | None = Query(None),
     ingredient: str | None = Query(None),
     name: str | None = Query(None),
-    diet_type: str | None = Query(None)
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    user_id: str | None = Query(None)
 ):
+    target_user_id = _resolve_user_id(x_user_email, user_id)
     try:
-        return await recipe_service.search_advanced(user_id, max_calories, min_protein, ingredient, name, diet_type=diet_type)
+        return await recipe_service.search_advanced(target_user_id, max_calories, min_protein, ingredient, name)
     except Exception as e:
         raise InfrastructureException(message="Error searching advanced recipes", details={"cause": str(e)}) from e
 
 @router.get("/verify")
 async def verify_compatibility(
-    user_id: str = Query(...),
     ingredient_name: str = Query(...),
-    diet_type: str | None = Query(None)
+    x_user_email: str | None = Header(None, alias="X-User-Email"),
+    user_id: str | None = Query(None)
 ):
+    target_user_id = _resolve_user_id(x_user_email, user_id)
     try:
-        is_compatible = await recipe_service.verify_compatibility(user_id, ingredient_name, diet_type=diet_type)
+        is_compatible = await recipe_service.verify_compatibility(target_user_id, ingredient_name)
         return {"compatible": is_compatible}
     except Exception as e:
         raise InfrastructureException(message="Error verifying compatibility", details={"cause": str(e)}) from e

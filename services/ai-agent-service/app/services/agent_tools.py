@@ -15,8 +15,12 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
-async def _fetch(url: str, params: dict = None) -> Any:
-    """Realiza una petición GET con reintentos automáticos ante fallos de infraestructura."""
+async def _fetch(url: str, user_id: str = None, params: dict = None) -> Any:
+    """Realiza una petición GET con reintentos automáticos pasando identidades en cabeceras seguras."""
+    headers = {}
+    if user_id:
+        headers["X-User-Email"] = user_id
+
     async for attempt in AsyncRetrying(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -25,9 +29,24 @@ async def _fetch(url: str, params: dict = None) -> Any:
     ):
         with attempt:
             try:
-                response = await http_client.get(url, params=params)
+                response = await http_client.get(url, params=params, headers=headers)
                 response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                text = response.text.strip()
+                if "application/json" not in content_type and not (text.startswith("{") or text.startswith("[")):
+                    logger.error(f"Se recibió HTML/texto plano en lugar de JSON desde {url}: {text[:200]}")
+                    raise InfrastructureException(
+                        message=f"La URL del servicio de nutrición ({url}) devolvió HTML/index.html en lugar de JSON. "
+                                f"Revisa en Render que la variable NUTRITION_GRAPH_SERVICE_URL apunte al servicio backend de nutrición y no al frontend.",
+                        details={"url": url, "snippet": text[:200]}
+                    )
                 return response.json()
+            except json.JSONDecodeError as exc:
+                logger.error("JSONDecodeError al parsear respuesta de %s: %s", url, response.text[:200])
+                raise InfrastructureException(
+                    message=f"Respuesta inválida (no es JSON) desde {url}. Verifica NUTRITION_GRAPH_SERVICE_URL en Render.",
+                    details={"url": url, "snippet": response.text[:200]},
+                ) from exc
             except httpx.HTTPStatusError as exc:
                 logger.error("Error calling %s: %s", url, exc.response.text)
                 raise InfrastructureException(
@@ -48,18 +67,15 @@ def _get_base_url() -> str:
         base = f"{base}/api/v1"
     return base
 
-async def _buscar_receta_por_macros(user_id: str, max_calories: float, min_protein: float, diet_type: str = None) -> str:
+async def _buscar_receta_por_macros(user_id: str, max_calories: float, min_protein: float) -> str:
     """Busca recetas recomendadas para un usuario que cumplan con requisitos de calorías máximas y proteína mínima. Devuelve las recetas y sus macros."""
     url = f"{_get_base_url()}/recipes/search"
     params = {
-        "user_id": user_id,
         "max_calories": max_calories,
         "min_protein": min_protein,
     }
-    if diet_type:
-        params["diet_type"] = diet_type
     try:
-        result = await _fetch(url, params)
+        result = await _fetch(url, user_id=user_id, params=params)
     except InfrastructureException as e:
         return f"Error al consultar recetas: {e.message}"
 
@@ -80,16 +96,15 @@ async def _buscar_recetas_avanzado(
     max_calories: float = None, 
     min_protein: float = None, 
     ingrediente: str = None, 
-    nombre_receta: str = None,
-    diet_type: str = None
+    nombre_receta: str = None
 ) -> str:
     """
     Busca recetas para un usuario aplicando filtros opcionales. 
-    Puedes filtrar por máximo de calorías, mínimo de proteína, contener un ingrediente específico, nombre de receta o tipo de dieta (ej. 'Vegana').
+    Puedes filtrar por máximo de calorías, mínimo de proteína, contener un ingrediente específico o por el nombre de la receta.
     Devuelve las recetas (ID, nombre, macros, ingredientes).
     """
     url = f"{_get_base_url()}/recipes/search_advanced"
-    params = {"user_id": user_id}
+    params = {}
     if max_calories is not None:
         params["max_calories"] = max_calories
     if min_protein is not None:
@@ -98,11 +113,9 @@ async def _buscar_recetas_avanzado(
         params["ingredient"] = ingrediente
     if nombre_receta:
         params["name"] = nombre_receta
-    if diet_type:
-        params["diet_type"] = diet_type
         
     try:
-        result = await _fetch(url, params)
+        result = await _fetch(url, user_id=user_id, params=params)
     except InfrastructureException as e:
         return f"Error al consultar recetas: {e.message}"
 
@@ -119,27 +132,24 @@ async def _buscar_recetas_avanzado(
         )
     return formatted
 
-async def _verificar_compatibilidad_alimento(user_id: str, ingredient_name: str, diet_type: str = None) -> str:
-    """Verifica si un ingrediente específico es compatible con el usuario (revisa alergias y tipo de dieta como 'Vegana')."""
+async def _verificar_compatibilidad_alimento(user_id: str, ingredient_name: str) -> str:
+    """Verifica si un ingrediente específico es compatible con el usuario (revisa alergias y tipo de dieta en la base de datos)."""
     url = f"{_get_base_url()}/recipes/verify"
     params = {
-        "user_id": user_id,
         "ingredient_name": ingredient_name,
     }
-    if diet_type:
-        params["diet_type"] = diet_type
     try:
-        result = await _fetch(url, params)
+        result = await _fetch(url, user_id=user_id, params=params)
     except InfrastructureException as e:
         return f"Error al verificar compatibilidad: {e.message}"
 
     is_compatible = result.get("compatible", False)
     if is_compatible:
-        return f"El ingrediente '{ingredient_name}' es SEGURO y compatible para el usuario {user_id}."
+        return f"El ingrediente '{ingredient_name}' es SEGURO y compatible para tu perfil."
     else:
         return (
             f"ALERTA: El ingrediente '{ingredient_name}' NO ES COMPATIBLE "
-            f"(viola alergias o restricciones de dieta) para el usuario {user_id}."
+            f"(viola alergias o restricciones de tu dieta en la base de datos)."
         )
 
 
