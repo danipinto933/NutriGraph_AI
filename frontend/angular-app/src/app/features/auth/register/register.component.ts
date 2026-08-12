@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -46,6 +46,7 @@ import { AuthService } from '../../../core/services/auth.service';
                 class="input-glass" 
                 formControlName="email" 
                 placeholder="tu@email.com"
+                autocomplete="email"
               >
               <div *ngIf="registerForm.get('email')?.touched && registerForm.get('email')?.invalid" class="validation-error">
                 <small *ngIf="registerForm.get('email')?.errors?.['required']">El email es obligatorio.</small>
@@ -61,6 +62,7 @@ import { AuthService } from '../../../core/services/auth.service';
                 class="input-glass" 
                 formControlName="password" 
                 placeholder="••••••••"
+                autocomplete="new-password"
               >
               <div *ngIf="registerForm.get('password')?.touched && registerForm.get('password')?.invalid" class="validation-error">
                 <small *ngIf="registerForm.get('password')?.errors?.['required']">La contraseña es obligatoria.</small>
@@ -89,7 +91,7 @@ import { AuthService } from '../../../core/services/auth.service';
           <div class="email-icon">✉️</div>
           <h1 class="text-gradient">¡Verifica tu Correo!</h1>
           <p class="subtitle">
-            Hemos enviado un enlace de doble autorización a <strong class="highlight-email">{{ registeredEmail() }}</strong>.
+            Hemos enviado un enlace de doble autorización a <strong class="highlight-email">{{ maskedRegisteredEmail() }}</strong>.
           </p>
           
           <p class="info-text">
@@ -223,6 +225,14 @@ export class RegisterComponent {
   public registeredEmail = signal<string>('');
   public resendSuccess = signal<string | null>(null);
 
+  public maskedRegisteredEmail = computed(() => {
+    const email = this.registeredEmail();
+    if (!email || !email.includes('@')) return email;
+    const [name, domain] = email.split('@');
+    if (name.length <= 2) return `${name[0]}*@${domain}`;
+    return `${name[0]}${'*'.repeat(name.length - 2)}${name[name.length - 1]}@${domain}`;
+  });
+
   registerForm = this.fb.group({
     first_name: ['', [Validators.required, Validators.minLength(2), Validators.pattern('^[a-zA-ZñÑáéíóúÁÉÍÓÚ\\s]+$')]],
     email: ['', [Validators.required, Validators.email]],
@@ -231,8 +241,11 @@ export class RegisterComponent {
 
   onSubmit(): void {
     if (this.registerForm.valid) {
-      const email = this.registerForm.value.email || '';
-      this.authService.register(this.registerForm.value).subscribe({
+      const payload = { ...this.registerForm.value };
+      const email = payload.email || '';
+      // Limpiar la contraseña en texto plano del formulario inmediatamente tras la lectura
+      this.registerForm.get('password')?.reset('');
+      this.authService.register(payload).subscribe({
         next: () => {
           this.registeredEmail.set(email);
           this.isRegistered.set(true);

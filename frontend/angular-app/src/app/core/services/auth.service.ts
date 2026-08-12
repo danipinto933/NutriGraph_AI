@@ -63,10 +63,10 @@ export class AuthService {
         if (response && response.access_token) {
           this.setToken(response.access_token);
           this.fetchCurrentUser().subscribe({
-            error: err => console.error('[AuthService] Error al obtener usuario tras login:', err)
+            error: err => console.error('[AuthService] Error al obtener usuario tras login:', err?.status || err?.message || 'HTTP Error')
           });
         } else {
-          console.warn('[AuthService] Respuesta de login sin access_token válido:', response);
+          console.warn('[AuthService] Respuesta de login sin access_token válido');
         }
         this.isLoading.set(false);
       }),
@@ -102,10 +102,10 @@ export class AuthService {
         if (response && response.access_token) {
           this.setToken(response.access_token);
           this.fetchCurrentUser().subscribe({
-            error: err => console.error('[AuthService] Error al obtener usuario tras verificación:', err)
+            error: err => console.error('[AuthService] Error al obtener usuario tras verificación:', err?.status || err?.message || 'HTTP Error')
           });
         } else {
-          console.warn('[AuthService] Respuesta de verificación sin access_token válido:', response);
+          console.warn('[AuthService] Respuesta de verificación sin access_token válido');
         }
         this.isLoading.set(false);
       }),
@@ -196,7 +196,7 @@ export class AuthService {
         }
       }
     } catch (e) {
-      console.error('Error clearing session cookies and storage:', e);
+      console.error('Error clearing session cookies and storage');
     }
   }
 
