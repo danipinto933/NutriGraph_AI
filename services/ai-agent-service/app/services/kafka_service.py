@@ -13,6 +13,9 @@ class KafkaConsumerService:
         self.task = None
 
     async def start(self):
+        if not settings.KAFKA_BOOTSTRAP_SERVERS:
+            logger.info("Kafka bootstrap servers no configurados. Modo HTTP activo sin consumidor Kafka.")
+            return
         try:
             self.consumer = AIOKafkaConsumer(
                 settings.KAFKA_RECIPE_EVENTS_TOPIC,

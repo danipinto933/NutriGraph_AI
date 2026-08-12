@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     NEO4J_USER: str
     NEO4J_PASSWORD: str
     
-    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_BOOTSTRAP_SERVERS: str = ""
     KAFKA_CLIENT_ID: str = "user-auth-service"
     
     FRONTEND_URL: str
@@ -24,6 +24,6 @@ class Settings(BaseSettings):
     SMTP_USER: str
     SMTP_PASSWORD: str 
     
-    model_config = SettingsConfigDict(env_file="../../.env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=[".env", "../../.env"], env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

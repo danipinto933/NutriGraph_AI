@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str
     
     # Kafka Settings
-    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_BOOTSTRAP_SERVERS: str = ""
     KAFKA_USER_EVENTS_TOPIC: str = "user-events"
     KAFKA_USER_EVENTS_DLQ_TOPIC: str = "user-events-dlq"
     KAFKA_CONSUMER_GROUP: str = "nutrition-graph-service-group"
