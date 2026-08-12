@@ -8,39 +8,58 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class EmailService:
-    def __init__(self):
-        self.smtp_host = settings.SMTP_HOST
-        self.smtp_port = settings.SMTP_PORT
-        self.smtp_user = settings.SMTP_USER
-        self.smtp_password = settings.SMTP_PASSWORD
-        self.from_email = settings.EMAIL_FROM or settings.SMTP_USER
-        self.frontend_url = settings.FRONTEND_URL
+    @property
+    def smtp_host(self) -> str:
+        return settings.SMTP_HOST
+
+    @property
+    def smtp_port(self) -> int:
+        return int(settings.SMTP_PORT)
+
+    @property
+    def smtp_user(self) -> str:
+        return settings.SMTP_USER
+
+    @property
+    def smtp_password(self) -> str:
+        return settings.SMTP_PASSWORD
+
+    @property
+    def from_email(self) -> str:
+        return settings.EMAIL_FROM or settings.SMTP_USER
+
+    @property
+    def frontend_url(self) -> str:
+        return settings.FRONTEND_URL.rstrip('/')
 
     def _send_email_smtp_sync(self, to_email: str, subject: str, html_content: str) -> bool:
         try:
+            to_email_clean = to_email.strip().lower()
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = f"NutriGraph AI <{self.from_email}>"
-            msg["To"] = to_email
+            msg["To"] = to_email_clean
+            msg["Reply-To"] = self.from_email
 
             part = MIMEText(html_content, "html")
             msg.attach(part)
 
-            with smtplib.SMTP(self.smtp_host, int(self.smtp_port), timeout=10) as server:
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
                 server.starttls()
                 server.login(self.smtp_user, self.smtp_password)
-                server.sendmail(self.from_email, [to_email], msg.as_string())
+                server.sendmail(self.from_email, [to_email_clean], msg.as_string())
 
-            logger.info(f"Verification email sent successfully via SMTP to {to_email}")
+            logger.info(f"Verification email sent successfully via SMTP to recipient '{to_email_clean}' from '{self.from_email}'")
             return True
         except Exception as e:
-            logger.error(f"Error sending email via SMTP: {e}")
+            logger.error(f"Error sending email via SMTP to recipient '{to_email}': {e}")
             return False
 
     async def send_verification_email(self, to_email: str, first_name: str, verification_token: str) -> bool:
         """
         Sends a magic link email verification using Gmail SMTP.
         """
+        to_email_clean = to_email.strip().lower()
         verification_url = f"{self.frontend_url}/verify-email?token={verification_token}"
 
         html_content = f"""
@@ -143,6 +162,6 @@ class EmailService:
             return False
 
         subject = "Verifica tu cuenta en NutriGraph AI - Magic Link"
-        return await asyncio.to_thread(self._send_email_smtp_sync, to_email, subject, html_content)
+        return await asyncio.to_thread(self._send_email_smtp_sync, to_email_clean, subject, html_content)
 
 email_service = EmailService()
