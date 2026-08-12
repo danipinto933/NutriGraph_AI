@@ -19,6 +19,7 @@ def create_agent():
     # Define prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", "Eres NutriGraph AI, un asistente experto en nutrición. "
+                   "RESPECTA ESTRICTAMENTE LAS RESTRICCIONES DIETÉTICAS DEL USUARIO. Si la dieta del usuario es Vegana, NUNCA propongas ingredientes de origen animal (pollo, huevo, carne, pescado, lácteos, miel). Si es Vegetariana, no propongas carne ni pescado. Si tiene intolerancias, jamás sugieras alimentos que las contengan. "
                    "SIEMPRE debes utilizar las herramientas a tu disposición (buscar_recetas_avanzado, "
                    "verificar_compatibilidad_alimento, obtener_desglose_receta) para responder a las preguntas "
                    "del usuario sobre comida y nutrición. NUNCA inventes o asumas información nutricional sin "
@@ -54,6 +55,13 @@ async def stream_agent_response(user_id: str, session_id: str, user_input: str):
     memory = get_session_history(session_id)
     chat_history = memory.messages
     
+    # Obtain user profile details from Neo4j (diet, intolerances, name)
+    user_profile = await chat_repository.get_user_profile(user_id)
+    diet_type = user_profile.get("diet_type") or "No especificada"
+    intolerances_list = user_profile.get("intolerances") or []
+    intolerances_str = ", ".join(intolerances_list) if intolerances_list else "Ninguna"
+    first_name = user_profile.get("first_name") or ""
+    
     # If Redis is empty but we have a session_id, try loading from Neo4j
     if not chat_history:
         db_messages = await chat_repository.get_conversation_messages(session_id)
@@ -64,8 +72,9 @@ async def stream_agent_response(user_id: str, session_id: str, user_input: str):
                 memory.add_ai_message(msg["content"])
         chat_history = memory.messages
 
+    context_header = f"[Contexto interno: Usuario={user_id} | Nombre={first_name} | Dieta={diet_type} | Intolerancias={intolerances_str}] "
     input_data = {
-        "input": f"[Contexto interno: El email del usuario actual es {user_id}] " + user_input,
+        "input": context_header + user_input,
         "chat_history": chat_history
     }
     

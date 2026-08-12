@@ -24,13 +24,33 @@ class ChatRepository:
             await self.driver.close()
             logger.info("Closed Neo4j connection")
 
+    async def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        """Obtiene información del perfil del usuario (dieta, intolerancias y nombre) desde Neo4j."""
+        query = """
+        OPTIONAL MATCH (u:User) WHERE toLower(u.email) = toLower($user_id)
+        OPTIONAL MATCH (u)-[:HAS_INTOLERANCE]->(i:Allergen)
+        RETURN u.email AS email, 
+               u.first_name AS first_name,
+               u.diet_type AS diet_type,
+               collect(i.name) AS intolerances
+        """
+        try:
+            async with self.driver.session() as session:
+                result = await session.run(query, user_id=user_id)
+                record = await result.single()
+                if record:
+                    return dict(record)
+        except Exception as e:
+            logger.error(f"Error fetching user profile for {user_id}: {e}")
+        return {"email": user_id, "first_name": "", "diet_type": None, "intolerances": []}
+
     async def save_message(self, user_id: str, session_id: str, role: str, content: str, title: str = None) -> bool:
-        """Saves a message to a conversation. Creates the conversation if it doesn't exist."""
+        """Saves a message to a conversation. Creates the user node and conversation if they don't exist."""
         timestamp = datetime.now(pytz.utc).isoformat()
         
         # If title is provided (first message), we set it. Otherwise, we don't update title.
         query = """
-        MATCH (u:User {email: $user_id})
+        MERGE (u:User {email: $user_id})
         MERGE (u)-[:HAS_CONVERSATION]->(c:Conversation {session_id: $session_id})
         ON CREATE SET c.created_at = $timestamp, c.updated_at = $timestamp, c.title = $title
         ON MATCH SET c.updated_at = $timestamp
@@ -57,7 +77,8 @@ class ChatRepository:
     async def get_user_conversations(self, user_id: str) -> list[dict[str, Any]]:
         """Gets all conversations for a user, ordered by most recently updated."""
         query = """
-        MATCH (u:User {email: $user_id})-[:HAS_CONVERSATION]->(c:Conversation)
+        OPTIONAL MATCH (u:User) WHERE toLower(u.email) = toLower($user_id)
+        MATCH (u)-[:HAS_CONVERSATION]->(c:Conversation)
         RETURN c.session_id AS session_id, 
                c.title AS title, 
                c.created_at AS created_at, 

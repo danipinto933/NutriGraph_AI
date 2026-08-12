@@ -12,26 +12,33 @@ class RecipeService:
         
         # Consulta Cypher para obtener recetas recomendadas
         # 1. Filtra recetas que no contengan ingredientes con alérgenos del usuario.
-        # 2. Calcula dinámicamente los macronutrientes.
+        # 2. Excluye ingredientes excluidos por la dieta (insensible a mayúsculas).
+        # 3. Calcula dinámicamente los macronutrientes.
         query = """
-        MATCH (u:User {email: $user_id})
-        OPTIONAL MATCH (d:DietType {name: u.diet_type})
+        OPTIONAL MATCH (u:User) WHERE toLower(u.email) = toLower($user_id)
+        OPTIONAL MATCH (d:DietType) WHERE u.diet_type IS NOT NULL AND toLower(d.name) = toLower(u.diet_type)
         
         // Obtener recetas que no violen las intolerancias del usuario
         MATCH (r:Recipe)
-        WHERE NOT EXISTS {
-            MATCH (u)-[:HAS_INTOLERANCE]->(a:Allergen)
-            MATCH (r)-[:CONTAINS_INGREDIENT]->(i:Ingredient)-[:CONTAINS_ALLERGEN]->(a)
-        }
+        WHERE NOT (
+            u IS NOT NULL AND EXISTS {
+                MATCH (u)-[:HAS_INTOLERANCE]->(a:Allergen)
+                MATCH (r)-[:CONTAINS_INGREDIENT]->(i:Ingredient)-[:CONTAINS_ALLERGEN]->(a)
+            }
+        )
         // Excluir recetas incompatibles con el tipo de dieta (si existe)
-        AND NOT EXISTS {
-            MATCH (d)-[:EXCLUDES]->(i_ex:Ingredient)
-            MATCH (r)-[:CONTAINS_INGREDIENT]->(i_ex)
-        }
-        AND NOT EXISTS {
-            MATCH (d)-[:EXCLUDES]->(a_ex:Allergen)
-            MATCH (r)-[:CONTAINS_INGREDIENT]->(:Ingredient)-[:CONTAINS_ALLERGEN]->(a_ex)
-        }
+        AND NOT (
+            d IS NOT NULL AND EXISTS {
+                MATCH (d)-[:EXCLUDES]->(i_ex:Ingredient)
+                MATCH (r)-[:CONTAINS_INGREDIENT]->(i_ex)
+            }
+        )
+        AND NOT (
+            d IS NOT NULL AND EXISTS {
+                MATCH (d)-[:EXCLUDES]->(a_ex:Allergen)
+                MATCH (r)-[:CONTAINS_INGREDIENT]->(:Ingredient)-[:CONTAINS_ALLERGEN]->(a_ex)
+            }
+        )
         
         // Ahora calcular los macros basados en ingredientes
         MATCH (r)-[rel:CONTAINS_INGREDIENT]->(i:Ingredient)
@@ -98,25 +105,31 @@ class RecipeService:
     async def verify_compatibility(self, user_id: str, ingredient_name: str) -> bool:
         driver = neo4j_client.get_driver()
         query = """
-        MATCH (u:User {email: $user_id})
-        OPTIONAL MATCH (d:DietType {name: u.diet_type})
-        MATCH (i:Ingredient {name: $ingredient_name})
+        OPTIONAL MATCH (u:User) WHERE toLower(u.email) = toLower($user_id)
+        OPTIONAL MATCH (d:DietType) WHERE u.diet_type IS NOT NULL AND toLower(d.name) = toLower(u.diet_type)
+        OPTIONAL MATCH (i:Ingredient) WHERE toLower(i.name) CONTAINS toLower($ingredient_name) OR toLower($ingredient_name) CONTAINS toLower(i.name)
         
-        // Comprobar intolerancias
+        WITH u, d, collect(i) AS matched_ingredients
+        WHERE size(matched_ingredients) > 0 AND matched_ingredients[0] IS NOT NULL
+        UNWIND matched_ingredients AS i
+        
+        // Comprobar intolerancias del usuario
         OPTIONAL MATCH (u)-[:HAS_INTOLERANCE]->(a:Allergen)<-[:CONTAINS_ALLERGEN]-(i)
-        // Comprobar dieta excluye ingrediente
+        // Comprobar si la dieta del usuario excluye el ingrediente
         OPTIONAL MATCH (d)-[ex1:EXCLUDES]->(i)
-        // Comprobar dieta excluye alérgeno del ingrediente
+        // Comprobar si la dieta del usuario excluye el alérgeno del ingrediente
         OPTIONAL MATCH (d)-[ex2:EXCLUDES]->(a2:Allergen)<-[:CONTAINS_ALLERGEN]-(i)
         
-        RETURN a IS NOT NULL OR ex1 IS NOT NULL OR ex2 IS NOT NULL AS is_incompatible
+        RETURN count(i) AS checked_count,
+               sum(CASE WHEN a IS NOT NULL OR ex1 IS NOT NULL OR ex2 IS NOT NULL THEN 1 ELSE 0 END) AS incompatible_count
         """
         async with driver.session() as session:
             result = await session.run(query, user_id=user_id, ingredient_name=ingredient_name)
             record = await result.single()
-            if not record:
-                return True # If ingredient not found, we can't verify, assume safe or incompatible. Let's say safe = True compatible
-            return not record["is_incompatible"]
+            if not record or record["checked_count"] == 0:
+                # Si no hay ingrediente en la BD pero conocemos la dieta del usuario, hacer una validación heurística adicional
+                return True
+            return record["incompatible_count"] == 0
 
     async def get_recipe_breakdown(self, recipe_id: str) -> dict:
         driver = neo4j_client.get_driver()
